@@ -29,6 +29,16 @@ export function Scanner({ onScanComplete }: ScannerProps) {
 
   const requestPermissions = async () => {
     try {
+      // Check if mediaDevices is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast({
+          title: "Not supported",
+          description: "Your browser doesn't support camera access. Please use a modern browser with HTTPS.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
         audio: true,
@@ -46,9 +56,25 @@ export function Scanner({ onScanComplete }: ScannerProps) {
         description: "Camera and microphone are ready",
       });
     } catch (error) {
+      console.error("Camera access error:", error);
+      
+      let errorMessage = "Please allow camera and microphone access in your browser settings";
+      
+      if (error instanceof Error) {
+        if (error.name === "NotAllowedError") {
+          errorMessage = "Permission denied. Please check your browser settings and allow camera/microphone access.";
+        } else if (error.name === "NotFoundError") {
+          errorMessage = "No camera or microphone found on your device.";
+        } else if (error.name === "NotReadableError") {
+          errorMessage = "Camera is already in use by another application.";
+        } else if (error.name === "SecurityError") {
+          errorMessage = "Camera access requires HTTPS. Please ensure you're using a secure connection.";
+        }
+      }
+      
       toast({
-        title: "Permission denied",
-        description: "Please allow camera and microphone access",
+        title: "Camera access failed",
+        description: errorMessage,
         variant: "destructive",
       });
     }
