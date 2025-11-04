@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Scanner } from "@/components/Scanner";
+import { Upload } from "@/components/Upload";
 import { History } from "@/components/History";
-import { Shield, ScanLine, Clock } from "lucide-react";
+import { Shield, ScanLine, Clock, Upload as UploadIcon } from "lucide-react";
 
 interface HistoryItem {
   id: string;
@@ -52,6 +53,13 @@ const Index = () => {
             Scanner
           </TabsTrigger>
           <TabsTrigger
+            value="upload"
+            className="flex-1 data-[state=active]:bg-primary/10 data-[state=active]:text-primary gap-2"
+          >
+            <UploadIcon className="w-4 h-4" />
+            Upload
+          </TabsTrigger>
+          <TabsTrigger
             value="history"
             className="flex-1 data-[state=active]:bg-primary/10 data-[state=active]:text-primary gap-2"
           >
@@ -67,6 +75,10 @@ const Index = () => {
 
         <TabsContent value="scanner" className="m-0">
           <Scanner onScanComplete={handleScanComplete} />
+        </TabsContent>
+
+        <TabsContent value="upload" className="m-0">
+          <Upload onScanComplete={handleScanComplete} />
         </TabsContent>
 
         <TabsContent value="history" className="m-0">
