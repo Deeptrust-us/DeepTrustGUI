@@ -1,0 +1,17 @@
+{
+    "name": "DeepGuard – AI Content Verification",
+    "short_name": "DeepGuard",
+    "description": "Scan live media or uploads to detect deepfakes and verify authenticity.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#0f172a",
+    "theme_color": "#1ba4c5",
+    "icons": [
+      
+    ],
+    "shortcuts": [
+      
+    ]
+  }
