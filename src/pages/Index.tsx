@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scanner } from "@/components/Scanner";
+import Scanner from "@/components/Scanner";
 import { Upload } from "@/components/Upload";
 import { History } from "@/components/History";
 import { Shield, ScanLine, Clock, Upload as UploadIcon } from "lucide-react";

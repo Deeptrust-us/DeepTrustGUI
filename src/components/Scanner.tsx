@@ -1,21 +1,24 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Monitor, MonitorPlay } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type ScanStatus = "idle" | "scanning" | "complete";
 type ScanResult = "authentic" | "fake" | null;
+type CaptureMode = "camera" | "screen";
 
 interface ScannerProps {
   onScanComplete: (result: { status: ScanResult; timestamp: Date }) => void;
 }
 
-export function Scanner({ onScanComplete }: ScannerProps) {
+export default function Scanner({ onScanComplete }: ScannerProps) {
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasPermissions, setHasPermissions] = useState(false);
+  const [captureMode, setCaptureMode] = useState<CaptureMode>("camera");
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
 
@@ -27,7 +30,7 @@ export function Scanner({ onScanComplete }: ScannerProps) {
     };
   }, [stream]);
 
-  const requestPermissions = async () => {
+  const requestCameraPermissions = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
@@ -51,6 +54,54 @@ export function Scanner({ onScanComplete }: ScannerProps) {
         description: "Please allow camera and microphone access",
         variant: "destructive",
       });
+    }
+  };
+
+  const requestScreenCapture = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true, // Request audio from screen share if available
+      });
+      
+      setStream(mediaStream);
+      setHasPermissions(true);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+
+      // Handle user stopping screen share
+      mediaStream.getVideoTracks()[0].addEventListener("ended", () => {
+        setStream(null);
+        setHasPermissions(false);
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
+        toast({
+          title: "Screen share stopped",
+          description: "Screen recording has been stopped",
+        });
+      });
+
+      toast({
+        title: "Screen capture started",
+        description: "Your screen is being captured for analysis",
+      });
+    } catch (error) {
+      toast({
+        title: "Screen capture cancelled",
+        description: "Please select a screen or window to share",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const requestPermissions = async () => {
+    if (captureMode === "camera") {
+      await requestCameraPermissions();
+    } else {
+      await requestScreenCapture();
     }
   };
 
@@ -88,10 +139,45 @@ export function Scanner({ onScanComplete }: ScannerProps) {
   const resetScan = () => {
     setScanStatus("idle");
     setScanResult(null);
+    // Stop current stream when resetting
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+      setHasPermissions(false);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
   };
+
+  // Reset when switching modes
+  useEffect(() => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+      setHasPermissions(false);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
+  }, [captureMode]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4 space-y-6">
+      {/* Mode Selector */}
+      <Tabs value={captureMode} onValueChange={(value) => setCaptureMode(value as CaptureMode)} className="w-full max-w-md">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="camera" className="gap-2">
+            <Camera className="w-4 h-4" />
+            Camera
+          </TabsTrigger>
+          <TabsTrigger value="screen" className="gap-2">
+            <Monitor className="w-4 h-4" />
+            Screen
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <Card className="relative w-full max-w-md aspect-[3/4] overflow-hidden bg-card shadow-scanner">
         {/* Video Preview */}
         <video
@@ -106,11 +192,19 @@ export function Scanner({ onScanComplete }: ScannerProps) {
         {!hasPermissions && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/95 backdrop-blur-sm">
             <div className="flex gap-4 mb-4">
-              <Camera className="w-12 h-12 text-muted-foreground" />
-              <Mic className="w-12 h-12 text-muted-foreground" />
+              {captureMode === "camera" ? (
+                <>
+                  <Camera className="w-12 h-12 text-muted-foreground" />
+                  <Mic className="w-12 h-12 text-muted-foreground" />
+                </>
+              ) : (
+                <MonitorPlay className="w-12 h-12 text-muted-foreground" />
+              )}
             </div>
             <p className="text-sm text-muted-foreground text-center px-6">
-              Camera and microphone access required for deepfake detection
+              {captureMode === "camera" 
+                ? "Camera and microphone access required for deepfake detection"
+                : "Screen sharing required to analyze content on your screen"}
             </p>
           </div>
         )}
@@ -183,8 +277,17 @@ export function Scanner({ onScanComplete }: ScannerProps) {
             </>
           ) : (
             <>
-              <Camera className="w-5 h-5 mr-2" />
-              Enable Camera & Mic
+              {captureMode === "camera" ? (
+                <>
+                  <Camera className="w-5 h-5 mr-2" />
+                  Enable Camera & Mic
+                </>
+              ) : (
+                <>
+                  <Monitor className="w-5 h-5 mr-2" />
+                  Start Screen Share
+                </>
+              )}
             </>
           )}
         </Button>
