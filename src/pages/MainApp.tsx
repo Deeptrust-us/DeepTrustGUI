@@ -2,27 +2,34 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Scanner from "@/components/Scanner";
 import { Upload } from "@/components/Upload";
+import { useNavigate } from "react-router-dom";
 import { History } from "@/components/History";
 import { Shield, ScanLine, Clock, Upload as UploadIcon } from "lucide-react";
 
 interface HistoryItem {
   id: string;
+  resultId: string; // Add this - the ID used for the result page URL
   status: "authentic" | "fake";
   timestamp: Date;
 }
 
 const MainApp = () => {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
-
-  const handleScanComplete = (result: { status: "authentic" | "fake" | null; timestamp: Date }) => {
+  const navigate = useNavigate();
+  const handleScanComplete = (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => {
     if (result.status) {
       const newItem: HistoryItem = {
         id: `scan-${Date.now()}`,
+        resultId: result.resultId,
         status: result.status,
         timestamp: result.timestamp,
       };
       setHistoryItems((prev) => [newItem, ...prev]);
     }
+  };
+
+  const handleResultReady = (resultId: string, result: "authentic" | "fake" | null) => {
+    navigate(`/scan_result/${resultId}`);
   };
 
   return (
@@ -74,7 +81,7 @@ const MainApp = () => {
         </TabsList>
 
         <TabsContent value="scanner" className="m-0">
-          <Scanner onScanComplete={handleScanComplete} />
+          <Scanner onScanComplete={handleScanComplete} onResultReady={handleResultReady}/>
         </TabsContent>
 
         <TabsContent value="upload" className="m-0">

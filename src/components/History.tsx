@@ -1,11 +1,13 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ShieldCheck, ShieldAlert, Clock } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Clock, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "react-router-dom"; // Add this import
 
 interface HistoryItem {
   id: string;
+  resultId: string; // Add this
   status: "authentic" | "fake";
   timestamp: Date;
 }
@@ -15,6 +17,8 @@ interface HistoryProps {
 }
 
 export function History({ items }: HistoryProps) {
+  const navigate = useNavigate(); // Add this
+
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
@@ -46,10 +50,11 @@ export function History({ items }: HistoryProps) {
             {items.map((item) => (
               <Card
                 key={item.id}
-                className={`p-4 transition-all hover:shadow-md ${
+                onClick={() => navigate(`/scan_result/${item.resultId}`)} // Add click handler
+                className={`p-4 transition-all hover:shadow-md cursor-pointer hover:scale-[1.01] ${
                   item.status === "authentic"
-                    ? "border-success/30 bg-success/5"
-                    : "border-destructive/30 bg-destructive/5"
+                    ? "border-success/30 bg-success/5 hover:border-success/50"
+                    : "border-destructive/30 bg-destructive/5 hover:border-destructive/50"
                 }`}
               >
                 <div className="flex items-start gap-4">
@@ -93,6 +98,9 @@ export function History({ items }: HistoryProps) {
                       {formatDistanceToNow(item.timestamp, { addSuffix: true })}
                     </div>
                   </div>
+
+                  {/* Add chevron to indicate clickable */}
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
                 </div>
               </Card>
             ))}

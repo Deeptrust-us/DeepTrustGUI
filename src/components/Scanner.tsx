@@ -10,10 +10,11 @@ type ScanResult = "authentic" | "fake" | null;
 type CaptureMode = "camera" | "screen" | "audio";
 
 interface ScannerProps {
-  onScanComplete: (result: { status: ScanResult; timestamp: Date }) => void;
+  onScanComplete: (result: { status: ScanResult; timestamp: Date; resultId?: string }) => void;
+  onResultReady?: (resultId: string, result: ScanResult) => void;
 }
 
-export default function Scanner({ onScanComplete }: ScannerProps) {
+export default function Scanner({ onScanComplete, onResultReady }: ScannerProps) {
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -145,14 +146,23 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
     // Simulate scanning process (2.5 seconds)
     setTimeout(() => {
       // Random result for demo (70% authentic, 30% fake)
-      const result: ScanResult = Math.random() > 0.3 ? "authentic" : "fake";
-      setScanResult(result);
-      setScanStatus("complete");
+    const result: ScanResult = Math.random() > 0.3 ? "authentic" : "fake";
+    setScanResult(result);
+    setScanStatus("complete");
+    
+    // Generate unique result ID
+    const resultId = `result-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    onScanComplete({
+      status: result,
+      timestamp: new Date(),
+      resultId: resultId, // Add this
+    });
 
-      onScanComplete({
-        status: result,
-        timestamp: new Date(),
-      });
+    // Notify parent that result is ready (for navigation)
+    if (onResultReady) {
+      onResultReady(resultId, result);
+    }
 
       toast({
         title: result === "authentic" ? "Verified Authentic" : "Deepfake Detected",
@@ -160,6 +170,19 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           ? "This content appears to be genuine"
           : "Warning: This content may be manipulated",
         variant: result === "authentic" ? "default" : "destructive",
+        action: result === "fake" ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (onResultReady) {
+                onResultReady(resultId, result);
+              }
+            }}
+          >
+            View Details
+          </Button>
+        ) : undefined,
       });
     }, 2500);
   };
