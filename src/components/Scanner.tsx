@@ -11,10 +11,9 @@ type CaptureMode = "camera" | "screen" | "audio";
 
 interface ScannerProps {
   onScanComplete: (result: { status: ScanResult; timestamp: Date; resultId?: string }) => void;
-  onResultReady?: (resultId: string, result: ScanResult) => void;
 }
 
-export default function Scanner({ onScanComplete, onResultReady }: ScannerProps) {
+export default function Scanner({ onScanComplete }: ScannerProps) {
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -159,10 +158,6 @@ export default function Scanner({ onScanComplete, onResultReady }: ScannerProps)
       resultId: resultId, // Add this
     });
 
-    // Notify parent that result is ready (for navigation)
-    if (onResultReady) {
-      onResultReady(resultId, result);
-    }
 
       toast({
         title: result === "authentic" ? "Verified Authentic" : "Deepfake Detected",
@@ -175,9 +170,7 @@ export default function Scanner({ onScanComplete, onResultReady }: ScannerProps)
             variant="outline"
             size="sm"
             onClick={() => {
-              if (onResultReady) {
-                onResultReady(resultId, result);
-              }
+              
             }}
           >
             View Details

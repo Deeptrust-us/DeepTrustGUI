@@ -6,10 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 
 interface ScreenRecorderProps {
     onScanComplete?: (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => void;
-    onResultReady?: (resultId: string, result: "authentic" | "fake" | null) => void;
 }
 
-export default function ScreenRecorder({ onScanComplete, onResultReady }: ScreenRecorderProps) {
+export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) {
     const [isRecording, setIsRecording] = useState(false);
     const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -165,11 +164,6 @@ export default function ScreenRecorder({ onScanComplete, onResultReady }: Screen
         onScanComplete(result);
       }
 
-      // Navigate to result page if result is fake
-      if (onResultReady && isFake) {
-        onResultReady(resultId, "fake");
-      }
-
       setIsScanning(false);
 
       toast({
@@ -178,11 +172,11 @@ export default function ScreenRecorder({ onScanComplete, onResultReady }: Screen
           ? "This content appears to be manipulated"
           : "No signs of manipulation detected",
         variant: isFake ? "destructive" : "default",
-        action: isFake && onResultReady ? (
+        action: isFake ? (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onResultReady(resultId, "fake")}
+            onClick={() => (console.log("View Details"))}
           >
             View Details
           </Button>

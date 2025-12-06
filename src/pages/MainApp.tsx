@@ -90,7 +90,7 @@ const MainApp = () => {
         </TabsList>
 
         <TabsContent value="scanner" className="m-0">
-          <Scanner onScanComplete={handleScanComplete} onResultReady={handleResultReady}/>
+          <Scanner onScanComplete={handleScanComplete}/>
         </TabsContent>
 
         <TabsContent value="upload" className="m-0">
@@ -100,7 +100,6 @@ const MainApp = () => {
         <TabsContent value="record" className="m-0">
           <ScreenRecorder 
             onScanComplete={handleScanComplete}
-            onResultReady={handleResultReady}
           />
         </TabsContent>
 
