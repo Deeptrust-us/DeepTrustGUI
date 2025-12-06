@@ -176,6 +176,7 @@ export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) 
           <Button
             variant="outline"
             size="sm"
+            style={{ backgroundColor: "var(--primary)", color: "white" }}
             onClick={() => (console.log("View Details"))}
           >
             View Details

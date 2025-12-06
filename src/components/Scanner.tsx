@@ -145,18 +145,18 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
     // Simulate scanning process (2.5 seconds)
     setTimeout(() => {
       // Random result for demo (70% authentic, 30% fake)
-    const result: ScanResult = Math.random() > 0.3 ? "authentic" : "fake";
-    setScanResult(result);
-    setScanStatus("complete");
-    
-    // Generate unique result ID
-    const resultId = `result-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    onScanComplete({
-      status: result,
-      timestamp: new Date(),
-      resultId: resultId, // Add this
-    });
+      const result: ScanResult = Math.random() > 0.5 ? "authentic" : "fake";
+      setScanResult(result);
+      setScanStatus("complete");
+
+      // Generate unique result ID
+      const resultId = `result-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      onScanComplete({
+        status: result,
+        timestamp: new Date(),
+        resultId: resultId, // Add this
+      });
 
 
       toast({
@@ -169,8 +169,9 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           <Button
             variant="outline"
             size="sm"
+            style={{ backgroundColor: "var(--primary)", color: "white" }}
             onClick={() => {
-              
+              // navigate(`/scan_result/${resultId}`);
             }}
           >
             View Details
