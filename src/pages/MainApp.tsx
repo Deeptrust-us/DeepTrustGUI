@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Scanner from "@/components/Scanner";
 import { Upload } from "@/components/Upload";
-import { useNavigate } from "react-router-dom";
 import { History } from "@/components/History";
 import { Shield, ScanLine, Clock, Upload as UploadIcon, Video } from "lucide-react";
 import ScreenRecorder from "@/components/ScreenRecorder";
@@ -16,7 +15,7 @@ interface HistoryItem {
 
 const MainApp = () => {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
-  const navigate = useNavigate();
+  
   const handleScanComplete = (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => {
     if (result.status) {
       const newItem: HistoryItem = {
@@ -27,10 +26,6 @@ const MainApp = () => {
       };
       setHistoryItems((prev) => [newItem, ...prev]);
     }
-  };
-
-  const handleResultReady = (resultId: string, result: "authentic" | "fake" | null) => {
-    navigate(`/scan_result/${resultId}`);
   };
 
   return (

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +20,7 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasPermissions, setHasPermissions] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureMode>("camera");
+  const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
 
@@ -165,18 +167,18 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           ? "This content appears to be genuine"
           : "Warning: This content may be manipulated",
         variant: result === "authentic" ? "default" : "destructive",
-        action: result === "fake" ? (
+        action:
           <Button
             variant="outline"
             size="sm"
-            style={{ backgroundColor: "var(--primary)", color: "white" }}
+            style={{ backgroundColor: "var(--primary)", color: "black" }}
             onClick={() => {
-              // navigate(`/scan_result/${resultId}`);
+              navigate(`/scan_result/${resultId}`);
             }}
           >
             View Details
           </Button>
-        ) : undefined,
+
       });
     }, 2500);
   };

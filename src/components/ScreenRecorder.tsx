@@ -1,25 +1,26 @@
 import { useState, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Video, Download, Loader2, Square, ScanLine, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ScreenRecorderProps {
-    onScanComplete?: (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => void;
+  onScanComplete?: (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => void;
 }
 
 export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) {
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [isScanning, setIsScanning] = useState(false);
-    const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null); // Store blob for scanning
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const chunksRef = useRef<Blob[]>([]);
-    const streamRef = useRef<MediaStream | null>(null);
-    const { toast } = useToast();
+  const navigate = useNavigate();
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null); // Store blob for scanning
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const { toast } = useToast();
 
-    
 
   const startRecording = async () => {
     try {
@@ -35,8 +36,8 @@ export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) 
       const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
         ? "video/webm;codecs=vp9"
         : MediaRecorder.isTypeSupported("video/webm")
-        ? "video/webm"
-        : "video/mp4";
+          ? "video/webm"
+          : "video/mp4";
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType,
@@ -56,11 +57,11 @@ export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) 
       // Handle recording stop
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType });
-    const videoUrl = URL.createObjectURL(blob);
-    setRecordedVideo(videoUrl);
-    setRecordedBlob(blob); // Store blob for scanning
-    setIsProcessing(false);
-    setIsRecording(false);
+        const videoUrl = URL.createObjectURL(blob);
+        setRecordedVideo(videoUrl);
+        setRecordedBlob(blob); // Store blob for scanning
+        setIsProcessing(false);
+        setIsRecording(false);
 
         // Stop all tracks
         if (streamRef.current) {
@@ -167,21 +168,21 @@ export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) 
       setIsScanning(false);
 
       toast({
-        title: isFake ? "⚠️ Deepfake Detected" : "✓ Content Authentic",
+        title: isFake ? "Deepfake Detected" : "Verified Authentic",
         description: isFake
           ? "This content appears to be manipulated"
           : "No signs of manipulation detected",
         variant: isFake ? "destructive" : "default",
-        action: isFake ? (
+        action: 
           <Button
             variant="outline"
             size="sm"
             style={{ backgroundColor: "var(--primary)", color: "white" }}
-            onClick={() => (console.log("View Details"))}
+            onClick={() => (navigate(`/scan_result/${resultId}`))}
           >
             View Details
           </Button>
-        ) : undefined,
+        ,
       });
     }, 3000);
   };

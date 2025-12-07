@@ -2,23 +2,20 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Brain, ShieldCheck, ShieldAlert, ArrowLeft } from "lucide-react";
 
-const ScanResult = () => {
+interface ScanResultProps {
+  resultId: string;
+  type: "authentic" | "fake" | "Deepfake";
+  score: number;
+  manipulation: string;
+  probability: string;
+}
+
+const ScanResult = ({ resultId, type, score, manipulation, probability }: ScanResultProps) => {
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // In a real app, you'd fetch this data based on the ID from an API or store
-  // For now, we'll use mock data. You can enhance this later to store/retrieve actual results
-  const result = {
-    id: id || "unknown",
-    type: "Deepfake", // Could be "Authentic" or "Deepfake"
-    score: 99, // Percentage
-    manipulation: "Face", // e.g., "Face", "Audio", "None"
-    probability: "Very High", // e.g., "Low", "Medium", "High", "Very High"
-    mediaUrl: "https://via.placeholder.com/640x360?text=Deepfake+Video", // Placeholder
-    timestamp: new Date(),
-  };
-
-  const isDeepfake = result.type === "Deepfake";
+  const isDeepfake = type === "Deepfake";
   const scoreColor = isDeepfake ? "text-red-600" : "text-green-600";
   const probabilityColor = isDeepfake ? "text-red-500" : "text-green-500";
 
@@ -34,7 +31,7 @@ const ScanResult = () => {
           </div>
         </div>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">DeepGuard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">DeepTrust</h1>
           <p className="text-xs text-gray-600">AI Content Verification</p>
         </div>
       </div>
@@ -57,11 +54,6 @@ const ScanResult = () => {
       {/* Media Preview */}
       <div className="w-full max-w-2xl bg-gray-100 rounded-lg overflow-hidden shadow-lg mb-6">
         <div className="relative pt-[56.25%]">
-          <img
-            src={result.mediaUrl}
-            alt="Media Preview"
-            className="absolute top-0 left-0 w-full h-full object-cover"
-          />
           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
             <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-red-600 transition-colors">
               <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 20 20">
@@ -76,15 +68,15 @@ const ScanResult = () => {
       <div className="w-full max-w-md bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-200">
         <div className="flex justify-between items-center py-3 border-b border-gray-200">
           <span className="text-gray-700 font-medium">Overall Deepfake Score</span>
-          <span className={`text-xl font-bold ${scoreColor}`}>{result.score}%</span>
+          <span className={`text-xl font-bold ${scoreColor}`}>{score}%</span>
         </div>
         <div className="flex justify-between items-center py-3 border-b border-gray-200">
           <span className="text-gray-700 font-medium">Detected Manipulation</span>
-          <span className="text-gray-800 font-medium">{result.manipulation}</span>
+          <span className="text-gray-800 font-medium">{manipulation}</span>
         </div>
         <div className="flex justify-between items-center py-3">
           <span className="text-gray-700 font-medium">Probability</span>
-          <span className={`font-medium ${probabilityColor}`}>{result.probability}</span>
+          <span className={`font-medium ${probabilityColor}`}>{probability}</span>
         </div>
       </div>
 
