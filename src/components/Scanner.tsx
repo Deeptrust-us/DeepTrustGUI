@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Monitor, MonitorPlay } from "lucide-react";
+import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Monitor, MonitorPlay, Square, ScanLine } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-type ScanStatus = "idle" | "scanning" | "complete";
+type ScanStatus = "idle" | "recording" | "recorded" | "scanning" | "complete";
 type ScanResult = "authentic" | "fake" | null;
-type CaptureMode = "camera" | "screen" | "audio";
+type CaptureMode = "camera" | "audio";
 
 interface ScannerProps {
   onScanComplete: (result: { status: ScanResult; timestamp: Date; resultId?: string }) => void;
@@ -20,8 +20,13 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasPermissions, setHasPermissions] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureMode>("camera");
+  const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,46 +64,6 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
     }
   };
 
-  const requestScreenCapture = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true, // Request audio from screen share if available
-      });
-
-      setStream(mediaStream);
-      setHasPermissions(true);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-
-      // Handle user stopping screen share
-      mediaStream.getVideoTracks()[0].addEventListener("ended", () => {
-        setStream(null);
-        setHasPermissions(false);
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-        toast({
-          title: "Screen share stopped",
-          description: "Screen recording has been stopped",
-        });
-      });
-
-      toast({
-        title: "Screen capture started",
-        description: "Your screen is being captured for analysis",
-      });
-    } catch (error) {
-      toast({
-        title: "Screen capture cancelled",
-        description: "Please select a screen or window to share",
-        variant: "destructive",
-      });
-    }
-  };
-
   const requestAudioPermissions = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -108,9 +73,6 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
 
       setStream(mediaStream);
       setHasPermissions(true);
-
-      // For audio-only, we don't need to set video srcObject
-      // But we can still use the video element to show audio visualization if needed
 
       toast({
         title: "Microphone access granted",
@@ -128,38 +90,123 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
   const requestPermissions = async () => {
     if (captureMode === "camera") {
       await requestCameraPermissions();
-    } else if (captureMode === "screen") {
-      await requestScreenCapture();
     } else if (captureMode === "audio") {
       await requestAudioPermissions();
     }
   };
 
-  const startScan = async () => {
+  const startRecording = async () => {
     if (!hasPermissions) {
       await requestPermissions();
+      return;
+    }
+
+    if (!stream) return;
+
+    try {
+      // Determine MIME type based on mode
+      const mimeType = captureMode === "camera"
+        ? (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+            ? "video/webm;codecs=vp9"
+            : MediaRecorder.isTypeSupported("video/webm")
+            ? "video/webm"
+            : "video/mp4")
+        : (MediaRecorder.isTypeSupported("audio/webm")
+            ? "audio/webm"
+            : MediaRecorder.isTypeSupported("audio/mp4")
+            ? "audio/mp4"
+            : "audio/webm");
+
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: captureMode === "camera" ? 2500000 : undefined,
+        audioBitsPerSecond: 128000,
+      });
+
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        setRecordedVideo(url);
+        setRecordedBlob(blob);
+        setScanStatus("recorded");
+        setIsProcessing(false);
+
+        toast({
+          title: "Recording completed",
+          description: "Your recording is ready for analysis",
+        });
+      };
+
+      mediaRecorder.onerror = (event) => {
+        console.error("MediaRecorder error:", event);
+        toast({
+          title: "Recording error",
+          description: "An error occurred while recording",
+          variant: "destructive",
+        });
+        setScanStatus("idle");
+        setIsProcessing(false);
+      };
+
+      mediaRecorder.start(1000);
+      setScanStatus("recording");
+
+      toast({
+        title: "Recording started",
+        description: "Recording in progress. Click stop when finished.",
+      });
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      toast({
+        title: "Recording failed",
+        description: "Could not start recording",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      setIsProcessing(true);
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const scanRecordedContent = async () => {
+    if (!recordedBlob) {
+      toast({
+        title: "No recording to scan",
+        description: "Please record content first",
+        variant: "destructive",
+      });
       return;
     }
 
     setScanStatus("scanning");
     setScanResult(null);
 
-    // Simulate scanning process (2.5 seconds)
+    // Simulate scanning process
     setTimeout(() => {
-      // Random result for demo (70% authentic, 30% fake)
-      const result: ScanResult = Math.random() > 0.5 ? "authentic" : "fake";
+      const result: ScanResult = Math.random() > 0.3 ? "authentic" : "fake";
       setScanResult(result);
       setScanStatus("complete");
 
-      // Generate unique result ID
       const resultId = `result-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       onScanComplete({
         status: result,
         timestamp: new Date(),
-        resultId: resultId, // Add this
+        resultId: resultId,
       });
-
 
       toast({
         title: result === "authentic" ? "Verified Authentic" : "Deepfake Detected",
@@ -167,18 +214,16 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           ? "This content appears to be genuine"
           : "Warning: This content may be manipulated",
         variant: result === "authentic" ? "default" : "destructive",
-        action:
+        action: result === "fake" ? (
           <Button
             variant="outline"
             size="sm"
             style={{ backgroundColor: "var(--primary)", color: "black" }}
-            onClick={() => {
-              navigate(`/scan_result/${resultId}`);
-            }}
+            onClick={() => navigate(`/scan_result/${resultId}`)}
           >
             View Details
           </Button>
-
+        ) : undefined,
       });
     }, 2500);
   };
@@ -186,7 +231,10 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
   const resetScan = () => {
     setScanStatus("idle");
     setScanResult(null);
-    // Stop current stream when resetting
+    setRecordedVideo(null);
+    setRecordedBlob(null);
+    
+    // Stop current stream
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
@@ -194,6 +242,11 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
+    }
+
+    // Clean up recorded video URL
+    if (recordedVideo) {
+      URL.revokeObjectURL(recordedVideo);
     }
   };
 
@@ -207,6 +260,10 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
         videoRef.current.srcObject = null;
       }
     }
+    setRecordedVideo(null);
+    setRecordedBlob(null);
+    setScanResult(null);
+    setScanStatus("idle");
   }, [captureMode]);
 
   return (
@@ -226,8 +283,8 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
       </Tabs>
 
       <Card className="relative w-full max-w-md aspect-[3/4] overflow-hidden bg-card shadow-scanner">
-        {/* Video Preview */}
-        {captureMode !== "audio" && (
+        {/* Live Video Preview (only when recording or idle) */}
+        {captureMode === "camera" && scanStatus !== "recorded" && (
           <video
             ref={videoRef}
             autoPlay
@@ -237,8 +294,8 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           />
         )}
 
-        {/* Audio-only visualization */}
-        {captureMode === "audio" && hasPermissions && (
+        {/* Audio-only visualization (only when recording or idle) */}
+        {captureMode === "audio" && hasPermissions && scanStatus !== "recorded" && (
           <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-primary/20 to-primary/5">
             <div className="text-center space-y-4">
               <div className="relative w-32 h-32 mx-auto">
@@ -246,13 +303,37 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
                 <div className="absolute inset-4 rounded-full border-4 border-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }} />
                 <Mic className="w-16 h-16 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
               </div>
-              <p className="text-sm font-medium text-primary">Recording Audio</p>
+              <p className="text-sm font-medium text-primary">
+                {scanStatus === "recording" ? "Recording Audio..." : "Ready to Record"}
+              </p>
             </div>
           </div>
         )}
 
+        {/* Recorded Video/Audio Preview */}
+        {scanStatus === "recorded" && recordedVideo && (
+          <>
+            {captureMode === "camera" ? (
+              <video
+                src={recordedVideo}
+                controls
+                className="absolute inset-0 w-full h-full object-cover"
+                autoPlay
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-primary/20 to-primary/5">
+                <div className="text-center space-y-4">
+                  <Mic className="w-20 h-20 text-primary" />
+                  <p className="text-sm font-medium text-primary">Audio Recording</p>
+                  <audio src={recordedVideo} controls className="w-full max-w-xs" />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Overlay when no permissions */}
-        {!hasPermissions && (
+        {!hasPermissions && scanStatus === "idle" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/95 backdrop-blur-sm">
             <div className="flex gap-4 mb-4">
               {captureMode === "camera" ? (
@@ -260,19 +341,28 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
                   <Camera className="w-12 h-12 text-muted-foreground" />
                   <Mic className="w-12 h-12 text-muted-foreground" />
                 </>
-              ) : captureMode === "screen" ? (
-                <MonitorPlay className="w-12 h-12 text-muted-foreground" />
               ) : (
                 <Mic className="w-12 h-12 text-muted-foreground" />
               )}
             </div>
             <p className="text-sm text-muted-foreground text-center px-6">
               {captureMode === "camera"
-                ? "Camera and microphone access required for deepfake detection"
-                : captureMode === "screen"
-                  ? "Screen sharing required to analyze content on your screen"
-                  : "Microphone access required for audio analysis"}
+                ? "Camera and microphone access required"
+                : "Microphone access required for audio recording"}
             </p>
+          </div>
+        )}
+
+        {/* Recording Overlay */}
+        {scanStatus === "recording" && (
+          <div className="absolute inset-0 bg-red-500/10 backdrop-blur-[1px]">
+            <div className="absolute inset-0 border-2 border-red-500 animate-pulse" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center space-y-2">
+                <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse mx-auto" />
+                <p className="text-sm font-medium text-red-600">Recording...</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -330,17 +420,26 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
         )}
       </Card>
 
-      {/* Control Button */}
+      {/* Control Buttons */}
       {scanStatus === "idle" && (
         <Button
-          onClick={startScan}
+          onClick={startRecording}
           size="lg"
           className="w-full max-w-md h-14 bg-gradient-primary hover:opacity-90 text-white font-semibold text-lg shadow-glow"
         >
           {hasPermissions ? (
             <>
-              <ShieldCheck className="w-5 h-5 mr-2" />
-              Start Scan
+              {captureMode === "camera" ? (
+                <>
+                  <Camera className="w-5 h-5 mr-2" />
+                  Start Recording
+                </>
+              ) : (
+                <>
+                  <Mic className="w-5 h-5 mr-2" />
+                  Start Recording
+                </>
+              )}
             </>
           ) : (
             <>
@@ -348,11 +447,6 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
                 <>
                   <Camera className="w-5 h-5 mr-2" />
                   Enable Camera & Mic
-                </>
-              ) : captureMode === "screen" ? (
-                <>
-                  <Monitor className="w-5 h-5 mr-2" />
-                  Start Screen Share
                 </>
               ) : (
                 <>
@@ -363,6 +457,49 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
             </>
           )}
         </Button>
+      )}
+
+      {scanStatus === "recording" && (
+        <Button
+          onClick={stopRecording}
+          size="lg"
+          variant="destructive"
+          className="w-full max-w-md h-14 font-semibold text-lg"
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <Square className="w-5 h-5 mr-2" />
+              Stop Recording
+            </>
+          )}
+        </Button>
+      )}
+
+      {scanStatus === "recorded" && (
+        <div className="w-full max-w-md space-y-3">
+          <Button
+            onClick={scanRecordedContent}
+            size="lg"
+            className="w-full h-14 bg-gradient-primary hover:opacity-90 text-white font-semibold text-lg"
+          >
+            <ScanLine className="w-5 h-5 mr-2" />
+            Scan for Deepfakes
+          </Button>
+          <Button
+            onClick={resetScan}
+            size="lg"
+            variant="secondary"
+            className="w-full h-14 font-semibold text-lg"
+          >
+            Record Again
+          </Button>
+        </div>
       )}
 
       {scanStatus === "complete" && (
