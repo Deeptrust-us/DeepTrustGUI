@@ -107,13 +107,13 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
       // Determine MIME type based on mode
       const mimeType = captureMode === "camera"
         ? (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-            ? "video/webm;codecs=vp9"
-            : MediaRecorder.isTypeSupported("video/webm")
+          ? "video/webm;codecs=vp9"
+          : MediaRecorder.isTypeSupported("video/webm")
             ? "video/webm"
             : "video/mp4")
         : (MediaRecorder.isTypeSupported("audio/webm")
-            ? "audio/webm"
-            : MediaRecorder.isTypeSupported("audio/mp4")
+          ? "audio/webm"
+          : MediaRecorder.isTypeSupported("audio/mp4")
             ? "audio/mp4"
             : "audio/webm");
 
@@ -173,7 +173,38 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
       });
     }
   };
+//
+  const convertBlobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        resolve(base64String);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
 
+  const logBase64 = async () => {
+    if (!recordedBlob) {
+      console.log("No recorded video available");
+      return;
+    }
+
+    const base64 = await convertBlobToBase64(recordedBlob);
+    console.log("Base64 Video:", base64);
+    console.log("Base64 Length:", base64.length);
+
+    // Also copy to clipboard if needed
+    navigator.clipboard.writeText(base64).then(() => {
+      toast({
+        title: "Base64 copied",
+        description: "Base64 string copied to clipboard",
+      });
+    });
+  };
+//
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       setIsProcessing(true);
@@ -233,7 +264,7 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
     setScanResult(null);
     setRecordedVideo(null);
     setRecordedBlob(null);
-    
+
     // Stop current stream
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
