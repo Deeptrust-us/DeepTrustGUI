@@ -20,6 +20,7 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
 
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [scanResult, setScanResult] = useState<ScanResult>(null);
+  const [lastAnalysis, setLastAnalysis] = useState<{ classification?: string; score?: number | null } | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasPermissions, setHasPermissions] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureMode>("camera");
@@ -31,6 +32,43 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
+
+  const toNumericId = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const toStatusFromClassification = (value: unknown): ScanResult => {
+    if (typeof value !== "string") return null;
+    const v = value.trim().toLowerCase();
+    if (!v) return null;
+    if (v.includes("bonafide") || v.includes("bona fide") || v.includes("bona-fide")) return "authentic";
+    if (v.includes("auth") || v.includes("real") || v.includes("genuine")) return "authentic";
+    if (v.includes("deepfake") || v.includes("fake") || v.includes("manip")) return "fake";
+    return null;
+  };
+
+  const formatMaybePercent = (value: unknown): string | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      // Backend already returns a client-friendly 0..100 score.
+      return `${value.toFixed(2)}%`;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const numeric = Number(trimmed.replace("%", ""));
+      if (Number.isFinite(numeric)) {
+        return `${numeric.toFixed(2)}%`;
+      }
+      return trimmed;
+    }
+    return null;
+  };
 
   useEffect(() => {
     return () => {
@@ -230,28 +268,57 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
         : await audioDetection.postAudio(recordedBlob);
   
       const result = response.data;
+      const logId = toNumericId(result?.resultId ?? result?.id);
+      const status: ScanResult = result?.status ?? toStatusFromClassification(result?.classification);
+      setLastAnalysis({
+        classification: typeof result?.classification === "string" ? result.classification : undefined,
+        score: typeof result?.score === "number" ? result.score : null,
+      });
+
+      const verdictText =
+        status === "fake"
+          ? "This is potentially a Deepfake."
+          : status === "authentic"
+            ? "This looks good (Bonafide)."
+            : "Result received.";
+
+      const detailsParts: string[] = [];
+      const scoreText = formatMaybePercent(
+        result?.score
+      );
+      if (scoreText) detailsParts.push(`Score: ${scoreText}`);
+      if (typeof result?.classification === "string" && result.classification.trim()) {
+        detailsParts.push(`Classification: ${result.classification}`);
+      }
+      if (logId !== null) detailsParts.push(`Log #${logId}`);
   
-      setScanResult(result.status);
+      setScanResult(status);
       setScanStatus("complete");
   
       onScanComplete({
-        status: result.status,
+        status,
         timestamp: new Date(),
-        resultId: result.resultId,
+        resultId: logId !== null ? String(logId) : undefined,
       });
   
       toast({
-        title: result.status === "authentic" ? "Verified Authentic" : "Deepfake Detected",
-        description: result.status === "authentic"
-          ? "This content appears to be genuine"
-          : "Warning: This content may be manipulated",
-        variant: result.status === "authentic" ? "default" : "destructive",
-        action: result.status === "fake" ? (
+        title:
+          typeof result?.classification === "string" && result.classification.trim()
+            ? result.classification
+            : status === "authentic"
+              ? "Bonafide"
+              : "Deepfake",
+        description:
+          detailsParts.length > 0
+            ? `${verdictText} ${detailsParts.join(" • ")}`
+            : verdictText,
+        variant: status === "fake" ? "destructive" : "success",
+        action: logId !== null ? (
           <Button
             variant="outline"
             size="sm"
             style={{ backgroundColor: "var(--primary)", color: "black" }}
-            onClick={() => navigate(`/scan_result/${result.resultId}`)}
+            onClick={() => navigate(`/scan_result/${logId}`)}
           >
             View Details
           </Button>
@@ -312,6 +379,13 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
     setScanStatus("idle");
   }, [captureMode]);
 
+  const themedCardClass =
+    scanStatus === "complete" && scanResult
+      ? scanResult === "authentic"
+        ? "ring-2 ring-success/40 border-success/30"
+        : "ring-2 ring-destructive/40 border-destructive/30"
+      : "";
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4 space-y-6">
       {/* Mode Selector */}
@@ -328,7 +402,7 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
         </TabsList>
       </Tabs>
 
-      <Card className="relative w-full max-w-md aspect-[3/4] overflow-hidden bg-card shadow-scanner">
+      <Card className={`relative w-full max-w-md aspect-[3/4] overflow-hidden bg-card shadow-scanner ${themedCardClass}`}>
         {/* Live Video Preview (only when recording or idle) */}
         {captureMode === "camera" && scanStatus !== "recorded" && scanStatus !== "scanning" && scanStatus !== "complete" && (
           <video
@@ -431,9 +505,11 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
                 <>
                   <ShieldCheck className="w-20 h-20 text-success mx-auto" />
                   <div>
-                    <h3 className="text-2xl font-bold text-success-foreground">Verified Authentic</h3>
+                    <h3 className="text-2xl font-bold text-success-foreground">Bonafide</h3>
                     <p className="text-sm text-success-foreground/80 mt-2">
-                      No signs of manipulation detected
+                      {lastAnalysis?.score !== null && lastAnalysis?.score !== undefined
+                        ? `This looks good (Bonafide). Score: ${lastAnalysis.score.toFixed(2)}%`
+                        : "This looks good (Bonafide)."}
                     </p>
                   </div>
                 </>
@@ -443,7 +519,9 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
                   <div>
                     <h3 className="text-2xl font-bold text-destructive-foreground">Deepfake Detected</h3>
                     <p className="text-sm text-destructive-foreground/80 mt-2">
-                      Warning: Potential manipulation found
+                      {lastAnalysis?.score !== null && lastAnalysis?.score !== undefined
+                        ? `This is potentially a Deepfake. Score: ${lastAnalysis.score.toFixed(2)}%`
+                        : "This is potentially a Deepfake."}
                     </p>
                   </div>
                 </>

@@ -21,6 +21,43 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
   const [contentUrl, setContentUrl] = useState("");
   const navigate = useNavigate();
 
+  const toNumericId = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const toStatusFromClassification = (value: unknown): "authentic" | "fake" | null => {
+    if (typeof value !== "string") return null;
+    const v = value.trim().toLowerCase();
+    if (!v) return null;
+    if (v.includes("bonafide") || v.includes("bona fide") || v.includes("bona-fide")) return "authentic";
+    if (v.includes("auth") || v.includes("real") || v.includes("genuine")) return "authentic";
+    if (v.includes("deepfake") || v.includes("fake") || v.includes("manip")) return "fake";
+    return null;
+  };
+
+  const formatMaybePercent = (value: unknown): string | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      // Backend already returns a client-friendly 0..100 score.
+      return `${value.toFixed(2)}%`;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const numeric = Number(trimmed.replace("%", ""));
+      if (Number.isFinite(numeric)) {
+        return `${numeric.toFixed(2)}%`;
+      }
+      return trimmed;
+    }
+    return null;
+  };
+
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -64,9 +101,29 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
         : await videoDetection.postVideo(fileBlob);
   
       const result = response.data;
+      const logId = toNumericId(result?.resultId ?? result?.id);
+      const status: "authentic" | "fake" | null =
+        result?.status ?? toStatusFromClassification(result?.classification);
+
+      const verdictText =
+        status === "fake"
+          ? "This is potentially a Deepfake."
+          : status === "authentic"
+            ? "This looks good (Bonafide)."
+            : "Result received.";
+
+      const detailsParts: string[] = [];
+      const scoreText = formatMaybePercent(
+        result?.score
+      );
+      if (scoreText) detailsParts.push(`Score: ${scoreText}`);
+      if (typeof result?.classification === "string" && result.classification.trim()) {
+        detailsParts.push(`Classification: ${result.classification}`);
+      }
+      if (logId !== null) detailsParts.push(`Log #${logId}`);
   
       onScanComplete({
-        status: result.status,
+        status,
         timestamp: new Date(),
       });
   
@@ -75,17 +132,23 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
       setSelectedAudioFile(null);
   
       toast({
-        title: result.status === "authentic" ? "Content Authentic" : "Deepfake Detected",
-        description: result.status === "authentic"
-          ? "No signs of manipulation detected"
-          : "This content appears to be manipulated",
-        variant: result.status === "authentic" ? "default" : "destructive",
-        action: result.status === "fake" ? (
+        title:
+          typeof result?.classification === "string" && result.classification.trim()
+            ? result.classification
+            : status === "authentic"
+              ? "Bonafide"
+              : "Deepfake",
+        description:
+          detailsParts.length > 0
+            ? `${verdictText} ${detailsParts.join(" • ")}`
+            : verdictText,
+        variant: status === "fake" ? "destructive" : "success",
+        action: logId !== null ? (
           <Button
             variant="outline"
             size="sm"
             style={{ backgroundColor: "var(--primary)", color: "black" }}
-            onClick={() => navigate(`/scan_result/${result.resultId}`)}
+            onClick={() => navigate(`/scan_result/${logId}`)}
           >
             View Details
           </Button>
@@ -119,27 +182,16 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
     }
 
     setIsScanning(true);
-    
-    // Simulate scanning process
-    setTimeout(() => {
-      const isFake = Math.random() > 0.5;
-      const result = {
-        status: isFake ? ("fake" as const) : ("authentic" as const),
-        timestamp: new Date(),
-      };
-      
-      onScanComplete(result);
-      setIsScanning(false);
-      setContentUrl("");
-      
-      toast({
-        title: isFake ? "⚠️ Deepfake Detected" : "✓ Content Authentic",
-        description: isFake 
-          ? "This content appears to be manipulated" 
-          : "No signs of manipulation detected",
-        variant: isFake ? "destructive" : "default",
-      });
-    }, 3000);
+
+    // URL scanning is currently not wired to a backend endpoint.
+    // The URL tab is also disabled in the UI, so we avoid fake/random results here.
+    toast({
+      title: "URL scan not available",
+      description: "URL/Link scanning isn't implemented. Please use Upload File or Recorder instead.",
+      variant: "destructive",
+    });
+
+    setIsScanning(false);
   };
 
   const selectedFile = selectedVideoFile || selectedAudioFile;
