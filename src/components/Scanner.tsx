@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { videoDetection, ScanResult as ScanResultType } from "@/api/video/videoDetection";
-import { audioDetection } from "@/api/video/audioDetection";
+import { audioDetection } from "@/api/audio/audioDetection";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";

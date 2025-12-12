@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload as UploadIcon, Link as LinkIcon, FileVideo, Loader2, Mic, Video } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { videoDetection, ScanResult as ScanResultType } from "@/api/video/videoDetection";
-import { audioDetection } from "@/api/video/audioDetection";
+import { audioDetection } from "@/api/audio/audioDetection";
 
 interface UploadProps {
   onScanComplete: (result: { status: "authentic" | "fake" | null; timestamp: Date }) => void;
