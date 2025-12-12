@@ -1,6 +1,6 @@
 import api_instance from "../baseApi";
 
-const endpoint = "video_analyzer";
+const endpoint = "analyze_audio";
 
 export interface ScanResult {
   status: "authentic" | "fake";
@@ -10,22 +10,21 @@ export interface ScanResult {
   resultId: string;
 }
 
-export const videoDetection = {
-  // Post video blob to the backend
-  postVideo: function (videoBlob: Blob) {
+export const audioDetection = {
+  // Post audio blob to the backend
+  postAudio: function (audioBlob: Blob) {
     const formData = new FormData();
-    formData.append("video", videoBlob, "recording.webm");
+    formData.append("file", audioBlob, "recording.webm"); // Changed from "audio" to "file"
 
-    return api_instance.post<any>( // any instead of scanresult
+    return api_instance.post<any>(
       `${endpoint}`,
-      formData,
+    formData,
       {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-        timeout: 60000, // 60 seconds timeout for large files
+        timeout: 60000,
       }
     );
   },
-
 };

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { videoDetection, ScanResult as ScanResultType } from "@/api/video/videoDetection";
+import { audioDetection } from "@/api/video/audioDetection";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -173,7 +175,7 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
       });
     }
   };
-//
+
   const convertBlobToBase64 = (blob: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -186,25 +188,6 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
     });
   };
 
-  const logBase64 = async () => {
-    if (!recordedBlob) {
-      console.log("No recorded video available");
-      return;
-    }
-
-    const base64 = await convertBlobToBase64(recordedBlob);
-    console.log("Base64 Video:", base64);
-    console.log("Base64 Length:", base64.length);
-
-    // Also copy to clipboard if needed
-    navigator.clipboard.writeText(base64).then(() => {
-      toast({
-        title: "Base64 copied",
-        description: "Base64 string copied to clipboard",
-      });
-    });
-  };
-//
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       setIsProcessing(true);
@@ -221,42 +204,59 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
       });
       return;
     }
-
+  
     setScanStatus("scanning");
     setScanResult(null);
-
-    // Simulate scanning process
-    setTimeout(() => {
-      const result: ScanResult = Math.random() > 0.3 ? "authentic" : "fake";
-      setScanResult(result);
+  
+    try {
+      // Send the blob to backend based on capture mode
+      const response = captureMode === "camera"
+        ? await videoDetection.postVideo(recordedBlob)
+        : await audioDetection.postAudio(recordedBlob);
+  
+      const result: ScanResultType = response.data;
+  
+      setScanResult(result.status);
       setScanStatus("complete");
-
-      const resultId = `result-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
+  
       onScanComplete({
-        status: result,
+        status: result.status,
         timestamp: new Date(),
-        resultId: resultId,
+        resultId: result.resultId,
       });
-
+  
       toast({
-        title: result === "authentic" ? "Verified Authentic" : "Deepfake Detected",
-        description: result === "authentic"
+        title: result.status === "authentic" ? "Verified Authentic" : "Deepfake Detected",
+        description: result.status === "authentic"
           ? "This content appears to be genuine"
           : "Warning: This content may be manipulated",
-        variant: result === "authentic" ? "default" : "destructive",
-        action: result === "fake" ? (
+        variant: result.status === "authentic" ? "default" : "destructive",
+        action: result.status === "fake" ? (
           <Button
             variant="outline"
             size="sm"
             style={{ backgroundColor: "var(--primary)", color: "black" }}
-            onClick={() => navigate(`/scan_result/${resultId}`)}
+            onClick={() => navigate(`/scan_result/${result.resultId}`)}
           >
             View Details
           </Button>
         ) : undefined,
       });
-    }, 2500);
+    } catch (error: any) {
+      console.error("Scan error:", error);
+  
+      const errorMessage = error.response?.data?.message
+        || error.message
+        || "Could not analyze content. Please try again.";
+  
+      toast({
+        title: "Scan failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+  
+      setScanStatus("recorded"); // Go back to recorded state on error
+    }
   };
 
   const resetScan = () => {
@@ -326,7 +326,8 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
         )}
 
         {/* Audio-only visualization (only when recording or idle) */}
-        {captureMode === "audio" && hasPermissions && scanStatus !== "recorded" && (
+        {/* Audio-only visualization (only when idle, not when recording) */}
+        {captureMode === "audio" && hasPermissions && scanStatus === "idle" && (
           <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-primary/20 to-primary/5">
             <div className="text-center space-y-4">
               <div className="relative w-32 h-32 mx-auto">
@@ -334,12 +335,11 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
                 <div className="absolute inset-4 rounded-full border-4 border-primary/50 animate-pulse" style={{ animationDelay: '0.2s' }} />
                 <Mic className="w-16 h-16 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
               </div>
-              <p className="text-sm font-medium text-primary">
-                {scanStatus === "recording" ? "Recording Audio..." : "Ready to Record"}
-              </p>
+              <p className="text-sm font-medium text-primary">Ready to Record</p>
             </div>
           </div>
         )}
+
 
         {/* Recorded Video/Audio Preview */}
         {scanStatus === "recorded" && recordedVideo && (
@@ -385,6 +385,7 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
         )}
 
         {/* Recording Overlay */}
+        {/* Recording Overlay - Shows for both video and audio */}
         {scanStatus === "recording" && (
           <div className="absolute inset-0 bg-red-500/10 backdrop-blur-[1px]">
             <div className="absolute inset-0 border-2 border-red-500 animate-pulse" />
@@ -396,6 +397,7 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
             </div>
           </div>
         )}
+
 
         {/* Scanning Overlay */}
         {scanStatus === "scanning" && (
