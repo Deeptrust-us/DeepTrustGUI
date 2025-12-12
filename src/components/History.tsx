@@ -2,9 +2,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, ShieldAlert, Clock, Trash2, Eye, Loader2, RefreshCw } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Clock, Trash2, Eye, Loader2, RefreshCw, ArrowUpDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
 
 interface HistoryItem {
   id: number;
@@ -23,18 +24,44 @@ interface HistoryProps {
 
 export function History({ items, onDelete, onRefresh, isLoading = false, embedded = false }: HistoryProps) {
   const navigate = useNavigate();
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc"); // asc = oldest -> newest
 
   // Helper function to combine date and hour into a Date object
   const getTimestamp = (date: string, hour: string): Date => {
     try {
-      // Combine date and hour strings into a proper Date
-      const dateTimeString = `${date} ${hour}`;
-      return new Date(dateTimeString);
+      const safeDate = String(date ?? "").trim();
+      const safeHour = String(hour ?? "").trim();
+
+      // Prefer ISO-like parsing when possible: YYYY-MM-DD + HH:mm:ss(.sss)
+      const hourNoFraction = safeHour.includes(".") ? safeHour.split(".")[0] : safeHour;
+      const isoCandidate = safeDate && hourNoFraction ? `${safeDate}T${hourNoFraction}` : "";
+      const parsedIso = isoCandidate ? new Date(isoCandidate) : new Date("");
+      if (!Number.isNaN(parsedIso.getTime())) return parsedIso;
+
+      // Fallback: browser parsing
+      const dateTimeString = `${safeDate} ${safeHour}`.trim();
+      const parsed = new Date(dateTimeString);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+
+      return new Date();
     } catch {
       // Fallback to current date if parsing fails
       return new Date();
     }
   };
+
+  const sortedItems = useMemo(() => {
+    const copy = [...items];
+    copy.sort((a, b) => {
+      const ta = getTimestamp(a.date, a.hour).getTime();
+      const tb = getTimestamp(b.date, b.hour).getTime();
+      const diff = ta - tb;
+      if (diff !== 0) return sortOrder === "asc" ? diff : -diff;
+      // Tie-breaker for deterministic order
+      return sortOrder === "asc" ? a.id - b.id : b.id - a.id;
+    });
+    return copy;
+  }, [items, sortOrder]);
 
   const emptyStateWrapperClass = embedded
     ? "flex flex-col items-center justify-center min-h-[16rem] p-4"
@@ -94,23 +121,34 @@ export function History({ items, onDelete, onRefresh, isLoading = false, embedde
               {items.length} {items.length === 1 ? "scan" : "scans"}
             </Badge>
           </div>
-          {onRefresh && (
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={onRefresh}
-              disabled={isLoading}
+              onClick={() => setSortOrder((o) => (o === "asc" ? "desc" : "asc"))}
               className="flex items-center gap-2"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-              Refresh
+              <ArrowUpDown className="w-4 h-4" />
+              {sortOrder === "asc" ? "Oldest" : "Newest"}
             </Button>
-          )}
+            {onRefresh && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRefresh}
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            )}
+          </div>
         </div>
 
         <ScrollArea className={scrollAreaHeightClass}>
           <div className="space-y-3">
-            {items.map((item) => {
+            {sortedItems.map((item) => {
               const isAuthentic = !item.is_deepfake;
               const timestamp = getTimestamp(item.date, item.hour);
               
