@@ -21,7 +21,11 @@ const MainApp = () => {
       console.log(response.data);
       const logs = response.data.map((log: any) => ({
         id: log.id,
-        is_deepfake: log.is_deepfake,
+        is_deepfake: Boolean(
+          log.is_deepfake ??
+            log.isDeepFake ??
+            (typeof log.classification === "string" && log.classification.toLowerCase().includes("deepfake"))
+        ),
         date: log.date.toString(),
         hour: log.hour.toString(),
       }));
