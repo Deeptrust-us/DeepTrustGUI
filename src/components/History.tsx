@@ -135,8 +135,8 @@ export function History({ items, onDelete, onRefresh, isLoading = false }: Histo
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-foreground">
                           {isAuthentic
-                            ? "Verified Authentic"
-                            : "Deepfake Detected"}
+                            ? "Bonafide"
+                            : "Deepfake"}
                         </h3>
                         <Badge
                           variant={isAuthentic ? "default" : "destructive"}
