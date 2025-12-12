@@ -279,7 +279,13 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
             <CardContent className="space-y-5">
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 {previewUrl && selectedKind === "video" && (
-                  <video src={previewUrl} controls className="w-full rounded-md bg-black" />
+                  <div className="w-full max-h-[420px] overflow-hidden rounded-md bg-black flex items-center justify-center">
+                    <video
+                      src={previewUrl}
+                      controls
+                      className="max-h-[420px] max-w-full w-auto h-auto object-contain"
+                    />
+                  </div>
                 )}
                 {previewUrl && selectedKind === "audio" && (
                   <div className="space-y-3">
