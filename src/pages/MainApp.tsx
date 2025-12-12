@@ -5,7 +5,7 @@ import { Upload } from "@/components/Upload";
 import { History } from "@/components/History";
 import { Shield, ScanLine, Clock, Upload as UploadIcon, Video } from "lucide-react";
 import ScreenRecorder from "@/components/ScreenRecorder";
-import { logApi } from "@/api/logs/apiLogHandling";
+import { logApi } from "@/api/handling/apiLogHandling";
 import { useToast } from "@/components/ui/use-toast";
 
 const MainApp = () => {
