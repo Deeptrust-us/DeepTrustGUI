@@ -152,10 +152,10 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
             <UploadIcon className="w-4 h-4" />
             Upload File
           </TabsTrigger>
-          <TabsTrigger value="url" className="gap-2">
+          {/*<TabsTrigger value="url" className="gap-2">
             <LinkIcon className="w-4 h-4" />
             URL/Link
-          </TabsTrigger>
+          </TabsTrigger>*/}
         </TabsList>
 
         <TabsContent value="file" className="mt-6">
@@ -167,7 +167,7 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Video File Picker */}
+              
               <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
                 <div className="flex items-center gap-3 mb-4">
                   <Video className="w-8 h-8 text-muted-foreground" />
@@ -190,7 +190,7 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
                 )}
               </div>
 
-              {/* Audio File Picker */}
+            
               <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
                 <div className="flex items-center gap-3 mb-4">
                   <Mic className="w-8 h-8 text-muted-foreground" />
@@ -213,7 +213,7 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
                 )}
               </div>
 
-              {/* Scan Button */}
+            
               <Button
                 onClick={handleFileUpload}
                 disabled={!selectedFile || isScanning}
@@ -236,7 +236,10 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="url" className="mt-6">
+        {/**
+         * 
+         * 
+         * <TabsContent value="url" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Enter Content URL</CardTitle>
@@ -275,6 +278,9 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
             </CardContent>
           </Card>
         </TabsContent>
+         * 
+         * 
+         */}
       </Tabs>
     </div>
   );
