@@ -1,23 +1,25 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ShieldCheck, ShieldAlert, Clock, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ShieldCheck, ShieldAlert, Clock, ChevronRight, Trash2, Eye } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
 interface HistoryItem {
   id: string;
-  resultId: string; // Add this
+  resultId: string;
   status: "authentic" | "fake";
   timestamp: Date;
 }
 
 interface HistoryProps {
   items: HistoryItem[];
+  onDelete: (id: string) => void; // Add delete handler prop
 }
 
-export function History({ items }: HistoryProps) {
-  const navigate = useNavigate(); // Add this
+export function History({ items, onDelete }: HistoryProps) {
+  const navigate = useNavigate();
 
   if (items.length === 0) {
     return (
@@ -50,11 +52,10 @@ export function History({ items }: HistoryProps) {
             {items.map((item) => (
               <Card
                 key={item.id}
-                onClick={() => navigate(`/scan_result/${item.resultId}`)} // Add click handler
-                className={`p-4 transition-all hover:shadow-md cursor-pointer hover:scale-[1.01] ${
+                className={`p-4 transition-all hover:shadow-md ${
                   item.status === "authentic"
-                    ? "border-success/30 bg-success/5 hover:border-success/50"
-                    : "border-destructive/30 bg-destructive/5 hover:border-destructive/50"
+                    ? "border-success/30 bg-success/5"
+                    : "border-destructive/30 bg-destructive/5"
                 }`}
               >
                 <div className="flex items-start gap-4">
@@ -99,8 +100,32 @@ export function History({ items }: HistoryProps) {
                     </div>
                   </div>
 
-                  {/* Add chevron to indicate clickable */}
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/scan_result/${item.resultId}`);
+                      }}
+                      className="flex items-center gap-1"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(item.id);
+                      }}
+                      className="flex items-center gap-1 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}

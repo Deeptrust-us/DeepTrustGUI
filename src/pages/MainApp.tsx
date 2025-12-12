@@ -17,7 +17,7 @@ const MainApp = () => {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   
   const handleScanComplete = (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => {
-    if (result.status) {
+    if (result.status && result.resultId) {
       const newItem: HistoryItem = {
         id: `scan-${Date.now()}`,
         resultId: result.resultId,
@@ -28,6 +28,11 @@ const MainApp = () => {
     }
   };
 
+  const handleDeleteItem = (id: string) => {
+    setHistoryItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -99,7 +104,7 @@ const MainApp = () => {
         </TabsContent>
 
         <TabsContent value="history" className="m-0">
-          <History items={historyItems} />
+          <History items={historyItems} onDelete={handleDeleteItem} />
         </TabsContent>
       </Tabs>
     </div>
