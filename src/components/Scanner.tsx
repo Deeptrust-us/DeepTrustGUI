@@ -4,8 +4,8 @@ import { audioDetection } from "@/api/video/audioDetection";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Monitor, MonitorPlay, Square, ScanLine } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Square, ScanLine } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type ScanStatus = "idle" | "recording" | "recorded" | "scanning" | "complete";
@@ -174,18 +174,6 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
         variant: "destructive",
       });
     }
-  };
-
-  const convertBlobToBase64 = (blob: Blob): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        resolve(base64String);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
   };
 
   const stopRecording = () => {
