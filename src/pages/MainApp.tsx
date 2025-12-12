@@ -8,6 +8,7 @@ import ScreenRecorder from "@/components/ScreenRecorder";
 import { logApi } from "@/api/handling/apiLogHandling";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
+import { DemoMenu, type DemoRequest } from "@/components/DemoMenu";
 
 type HistoryItem = { id: number; is_deepfake: boolean; date: string; hour: string };
 
@@ -17,6 +18,7 @@ const MainApp = () => {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [mode, setMode] = useState<Mode>("scanner");
+  const [demoRequest, setDemoRequest] = useState<DemoRequest | null>(null);
   const { toast } = useToast();
 
   const getErrorMessage = (error: unknown): string | undefined => {
@@ -123,10 +125,19 @@ const MainApp = () => {
         <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="font-semibold text-foreground tracking-tight">Deeptrust-US</div>
-            <Button variant="ghost" size="sm" onClick={scrollToHistory} className="gap-2">
-              <HistoryIcon className="w-4 h-4" />
-              {historyLabel}
-            </Button>
+            <div className="flex items-center gap-2">
+              <DemoMenu
+                basePath="/demos"
+                onPick={(req) => {
+                  setMode("upload");
+                  setDemoRequest(req);
+                }}
+              />
+              <Button variant="ghost" size="sm" onClick={scrollToHistory} className="gap-2">
+                <HistoryIcon className="w-4 h-4" />
+                {historyLabel}
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -173,7 +184,12 @@ const MainApp = () => {
                     <ScreenRecorder onScanComplete={handleScanComplete} embedded />
                   </TabsContent>
                   <TabsContent value="upload" className="m-0">
-                    <Upload onScanComplete={handleScanComplete} embedded />
+                    <Upload
+                      onScanComplete={handleScanComplete}
+                      embedded
+                      demoRequest={demoRequest}
+                      onDemoConsumed={() => setDemoRequest(null)}
+                    />
                   </TabsContent>
                 </div>
               </div>
