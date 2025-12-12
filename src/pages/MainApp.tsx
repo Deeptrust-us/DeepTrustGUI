@@ -1,38 +1,93 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Scanner from "@/components/Scanner";
 import { Upload } from "@/components/Upload";
 import { History } from "@/components/History";
 import { Shield, ScanLine, Clock, Upload as UploadIcon, Video } from "lucide-react";
 import ScreenRecorder from "@/components/ScreenRecorder";
-
-interface HistoryItem {
-  id: string;
-  resultId: string; // Add this - the ID used for the result page URL
-  status: "authentic" | "fake";
-  timestamp: Date;
-}
+import { logApi } from "@/api/logs/logHandling";
+import { useToast } from "@/components/ui/use-toast";
 
 const MainApp = () => {
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
-  
+  const [historyItems, setHistoryItems] = useState([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        setIsLoadingLogs(true);
+        const response = await logApi.getAllLogs();
+
+        console.log(response.data);
+        const logs = response.data.map((log: any) => ({
+          id : log.id,
+          is_deepfake : log.is_deepfake,
+          date : log.date.toString(),
+          hour : log.hour.toString(),
+        }));
+
+        setHistoryItems(logs);
+      } catch (error: any) {
+        console.error("Error fetching logs:", error);
+        toast({
+          title: "Failed to load history",
+          description: error.response?.data?.message || "Could not load scan history",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingLogs(false);
+      }
+    };
+
+    fetchLogs();
+  }, []);
+
   const handleScanComplete = (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => {
-    if (result.status && result.resultId) {
-      const newItem: HistoryItem = {
-        id: `scan-${Date.now()}`,
-        resultId: result.resultId,
-        status: result.status,
-        timestamp: result.timestamp,
-      };
-      setHistoryItems((prev) => [newItem, ...prev]);
+    // After a scan completes, refetch logs to get the latest data from the backend
+    // This ensures consistency with the database
+    const fetchLogs = async () => {
+      try {
+        const response = await logApi.getAllLogs();
+        const logs = response.data.map((log: any) => ({
+          id: log.id,
+          is_deepfake: log.is_deepfake,
+          date: log.date.toString(),
+          hour: log.hour.toString(),
+        }));
+        setHistoryItems(logs);
+      } catch (error) {
+        console.error("Error refetching logs:", error);
+      }
+    };
+    fetchLogs();
+  };
+
+  const handleDeleteItem = async (id: string) => {
+    try {
+      // Convert string id to number if your API expects a number
+      const logId = parseInt(id);
+
+      await logApi.deleteLogById(logId);
+
+      // Remove from local state
+      setHistoryItems((prev) => prev.filter((item) => item.id.toString() !== id));
+
+      toast({
+        title: "Log deleted",
+        description: "The scan log has been removed",
+      });
+    } catch (error: any) {
+      console.error("Error deleting log:", error);
+      toast({
+        title: "Delete failed",
+        description: error.response?.data?.message || "Could not delete the log",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleDeleteItem = (id: string) => {
-    setHistoryItems((prev) => prev.filter((item) => item.id !== id));
-  };
 
-  
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -74,7 +129,7 @@ const MainApp = () => {
             <UploadIcon className="w-4 h-4" />
             Upload
           </TabsTrigger>
-          
+
           <TabsTrigger
             value="history"
             className="flex-1 data-[state=active]:bg-primary/10 data-[state=active]:text-primary gap-2"
@@ -90,7 +145,7 @@ const MainApp = () => {
         </TabsList>
 
         <TabsContent value="scanner" className="m-0">
-          <Scanner onScanComplete={handleScanComplete}/>
+          <Scanner onScanComplete={handleScanComplete} />
         </TabsContent>
 
         <TabsContent value="upload" className="m-0">
@@ -98,13 +153,13 @@ const MainApp = () => {
         </TabsContent>
 
         <TabsContent value="record" className="m-0">
-          <ScreenRecorder 
+          <ScreenRecorder
             onScanComplete={handleScanComplete}
           />
         </TabsContent>
 
         <TabsContent value="history" className="m-0">
-          <History items={historyItems} onDelete={handleDeleteItem} />
+          <History items={historyItems} onDelete={handleDeleteItem} isLoading={isLoadingLogs} />
         </TabsContent>
       </Tabs>
     </div>
