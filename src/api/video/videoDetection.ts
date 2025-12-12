@@ -1,20 +1,12 @@
 import api_instance from "../baseApi";
 
-const endpoint = "video_analyzer";
-
-export interface ScanResult {
-  status: "authentic" | "fake";
-  score: number;
-  manipulation: string;
-  probability: string;
-  resultId: string;
-}
+const endpoint = "analyze_video";
 
 export const videoDetection = {
   // Post video blob to the backend
   postVideo: function (videoBlob: Blob) {
     const formData = new FormData();
-    formData.append("video", videoBlob, "recording.webm");
+    formData.append("file", videoBlob, "recording.webm");
 
     return api_instance.post<any>( // any instead of scanresult
       `${endpoint}`,

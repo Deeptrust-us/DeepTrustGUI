@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload as UploadIcon, Link as LinkIcon, FileVideo, Loader2, Mic, Video } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { videoDetection, ScanResult as ScanResultType } from "@/api/video/videoDetection";
+import { videoDetection } from "@/api/video/videoDetection";
 import { audioDetection } from "@/api/audio/audioDetection";
 
 interface UploadProps {
@@ -63,7 +63,7 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
         ? await audioDetection.postAudio(fileBlob)
         : await videoDetection.postVideo(fileBlob);
   
-      const result: ScanResultType = response.data;
+      const result = response.data;
   
       onScanComplete({
         status: result.status,

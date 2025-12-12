@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { videoDetection, ScanResult as ScanResultType } from "@/api/video/videoDetection";
+import { videoDetection } from "@/api/video/videoDetection";
 import { audioDetection } from "@/api/audio/audioDetection";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -202,7 +202,7 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
         ? await videoDetection.postVideo(recordedBlob)
         : await audioDetection.postAudio(recordedBlob);
   
-      const result: ScanResultType = response.data;
+      const result = response.data;
   
       setScanResult(result.status);
       setScanStatus("complete");

@@ -13,55 +13,41 @@ const MainApp = () => {
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const { toast } = useToast();
 
+  const fetchLogs = async () => {
+    try {
+      setIsLoadingLogs(true);
+      const response = await logApi.getAllLogs();
+
+      console.log(response.data);
+      const logs = response.data.map((log: any) => ({
+        id: log.id,
+        is_deepfake: log.is_deepfake,
+        date: log.date.toString(),
+        hour: log.hour.toString(),
+      }));
+
+      setHistoryItems(logs);
+    } catch (error: any) {
+      console.error("Error fetching logs:", error);
+      toast({
+        title: "Failed to load history",
+        description: error.response?.data?.message || "Could not load scan history",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        setIsLoadingLogs(true);
-        const response = await logApi.getAllLogs();
-
-        console.log(response.data);
-        const logs = response.data.map((log: any) => ({
-          id : log.id,
-          is_deepfake : log.is_deepfake,
-          date : log.date.toString(),
-          hour : log.hour.toString(),
-        }));
-
-        setHistoryItems(logs);
-      } catch (error: any) {
-        console.error("Error fetching logs:", error);
-        toast({
-          title: "Failed to load history",
-          description: error.response?.data?.message || "Could not load scan history",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingLogs(false);
-      }
-    };
-
     fetchLogs();
   }, []);
 
   const handleScanComplete = (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => {
     // After a scan completes, refetch logs to get the latest data from the backend
-    // This ensures consistency with the database
-    const fetchLogs = async () => {
-      try {
-        const response = await logApi.getAllLogs();
-        const logs = response.data.map((log: any) => ({
-          id: log.id,
-          is_deepfake: log.is_deepfake,
-          date: log.date.toString(),
-          hour: log.hour.toString(),
-        }));
-        setHistoryItems(logs);
-      } catch (error) {
-        console.error("Error refetching logs:", error);
-      }
-    };
     fetchLogs();
   };
+
 
   const handleDeleteItem = async (id: string) => {
     try {

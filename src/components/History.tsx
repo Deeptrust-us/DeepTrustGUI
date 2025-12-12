@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, ShieldAlert, Clock, Trash2, Eye, Loader2 } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Clock, Trash2, Eye, Loader2, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -16,10 +16,11 @@ interface HistoryItem {
 interface HistoryProps {
   items: HistoryItem[];
   onDelete: (id: string) => void;
+  onRefresh?: () => void;
   isLoading?: boolean;
 }
 
-export function History({ items, onDelete, isLoading = false }: HistoryProps) {
+export function History({ items, onDelete, onRefresh, isLoading = false }: HistoryProps) {
   const navigate = useNavigate();
 
   // Helper function to combine date and hour into a Date object
@@ -61,6 +62,16 @@ export function History({ items, onDelete, isLoading = false }: HistoryProps) {
               Your scan history will appear here once you start analyzing content
             </p>
           </div>
+          {onRefresh && (
+            <Button
+              variant="outline"
+              onClick={onRefresh}
+              className="mt-4"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -70,10 +81,24 @@ export function History({ items, onDelete, isLoading = false }: HistoryProps) {
     <div className="p-4 pb-20">
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-foreground">Scan History</h2>
-          <Badge variant="secondary" className="text-sm">
-            {items.length} {items.length === 1 ? "scan" : "scans"}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-foreground">Scan History</h2>
+            <Badge variant="secondary" className="text-sm">
+              {items.length} {items.length === 1 ? "scan" : "scans"}
+            </Badge>
+          </div>
+          {onRefresh && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          )}
         </div>
 
         <ScrollArea className="h-[calc(100vh-12rem)]">
