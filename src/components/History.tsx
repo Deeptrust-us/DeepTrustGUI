@@ -2,9 +2,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, ShieldAlert, Clock, Trash2, Eye, Loader2, RefreshCw } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Clock, Trash2, Eye, Loader2, RefreshCw, ArrowUpDown } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
 
 interface HistoryItem {
   id: number;
@@ -18,26 +19,59 @@ interface HistoryProps {
   onDelete: (id: string) => void;
   onRefresh?: () => void;
   isLoading?: boolean;
+  embedded?: boolean;
 }
 
-export function History({ items, onDelete, onRefresh, isLoading = false }: HistoryProps) {
+export function History({ items, onDelete, onRefresh, isLoading = false, embedded = false }: HistoryProps) {
   const navigate = useNavigate();
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc"); // asc = oldest -> newest
 
   // Helper function to combine date and hour into a Date object
   const getTimestamp = (date: string, hour: string): Date => {
     try {
-      // Combine date and hour strings into a proper Date
-      const dateTimeString = `${date} ${hour}`;
-      return new Date(dateTimeString);
+      const safeDate = String(date ?? "").trim();
+      const safeHour = String(hour ?? "").trim();
+
+      // Prefer ISO-like parsing when possible: YYYY-MM-DD + HH:mm:ss(.sss)
+      const hourNoFraction = safeHour.includes(".") ? safeHour.split(".")[0] : safeHour;
+      const isoCandidate = safeDate && hourNoFraction ? `${safeDate}T${hourNoFraction}` : "";
+      const parsedIso = isoCandidate ? new Date(isoCandidate) : new Date("");
+      if (!Number.isNaN(parsedIso.getTime())) return parsedIso;
+
+      // Fallback: browser parsing
+      const dateTimeString = `${safeDate} ${safeHour}`.trim();
+      const parsed = new Date(dateTimeString);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+
+      return new Date();
     } catch {
       // Fallback to current date if parsing fails
       return new Date();
     }
   };
 
+  const sortedItems = useMemo(() => {
+    const copy = [...items];
+    copy.sort((a, b) => {
+      const ta = getTimestamp(a.date, a.hour).getTime();
+      const tb = getTimestamp(b.date, b.hour).getTime();
+      const diff = ta - tb;
+      if (diff !== 0) return sortOrder === "asc" ? diff : -diff;
+      // Tie-breaker for deterministic order
+      return sortOrder === "asc" ? a.id - b.id : b.id - a.id;
+    });
+    return copy;
+  }, [items, sortOrder]);
+
+  const emptyStateWrapperClass = embedded
+    ? "flex flex-col items-center justify-center min-h-[16rem] p-4"
+    : "flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4";
+
+  const scrollAreaHeightClass = embedded ? "h-[28rem] md:h-[32rem]" : "h-[calc(100vh-12rem)]";
+
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
+      <div className={emptyStateWrapperClass}>
         <div className="text-center space-y-4 max-w-md">
           <Loader2 className="w-16 h-16 text-muted-foreground mx-auto animate-spin" />
           <div>
@@ -53,7 +87,7 @@ export function History({ items, onDelete, onRefresh, isLoading = false }: Histo
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
+      <div className={emptyStateWrapperClass}>
         <div className="text-center space-y-4 max-w-md">
           <Clock className="w-16 h-16 text-muted-foreground mx-auto" />
           <div>
@@ -78,7 +112,7 @@ export function History({ items, onDelete, onRefresh, isLoading = false }: Histo
   }
 
   return (
-    <div className="p-4 pb-20">
+    <div className={embedded ? "p-4" : "p-4 pb-20"}>
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -87,23 +121,34 @@ export function History({ items, onDelete, onRefresh, isLoading = false }: Histo
               {items.length} {items.length === 1 ? "scan" : "scans"}
             </Badge>
           </div>
-          {onRefresh && (
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={onRefresh}
-              disabled={isLoading}
+              onClick={() => setSortOrder((o) => (o === "asc" ? "desc" : "asc"))}
               className="flex items-center gap-2"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-              Refresh
+              <ArrowUpDown className="w-4 h-4" />
+              {sortOrder === "asc" ? "Oldest" : "Newest"}
             </Button>
-          )}
+            {onRefresh && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRefresh}
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            )}
+          </div>
         </div>
 
-        <ScrollArea className="h-[calc(100vh-12rem)]">
+        <ScrollArea className={scrollAreaHeightClass}>
           <div className="space-y-3">
-            {items.map((item) => {
+            {sortedItems.map((item) => {
               const isAuthentic = !item.is_deepfake;
               const timestamp = getTimestamp(item.date, item.hour);
               
@@ -135,8 +180,8 @@ export function History({ items, onDelete, onRefresh, isLoading = false }: Histo
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-foreground">
                           {isAuthentic
-                            ? "Verified Authentic"
-                            : "Deepfake Detected"}
+                            ? "Bonafide"
+                            : "Deepfake"}
                         </h3>
                         <Badge
                           variant={isAuthentic ? "default" : "destructive"}
