@@ -78,7 +78,8 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
     }
   };
 
-  const scanBlob = async (fileBlob: Blob, kind: "audio" | "video") => {
+  const scanBlob = async (fileBlob: Blob, kind: "audio" | "video", opts?: { clearSelection?: boolean }) => {
+    const clearSelection = opts?.clearSelection ?? true;
     setIsScanning(true);
 
     try {
@@ -108,8 +109,10 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
         timestamp: new Date(),
       });
 
-      setSelectedVideoFile(null);
-      setSelectedAudioFile(null);
+      if (clearSelection) {
+        setSelectedVideoFile(null);
+        setSelectedAudioFile(null);
+      }
 
       toast({
         title:
@@ -165,7 +168,7 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
     }
 
     const kind: "audio" | "video" = selectedAudioFile ? "audio" : "video";
-    await scanBlob(selectedFile, kind);
+    await scanBlob(selectedFile, kind, { clearSelection: true });
   };
 
   useEffect(() => {
@@ -296,7 +299,7 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
                 <Button
                   onClick={async () => {
                     if (!selectedFile || !selectedKind) return;
-                    await scanBlob(selectedFile, selectedKind);
+                    await scanBlob(selectedFile, selectedKind, { clearSelection: false });
                   }}
                   disabled={!selectedFile || !selectedKind || isScanning}
                   className="flex-1"
