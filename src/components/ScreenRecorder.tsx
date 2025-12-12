@@ -1,26 +1,28 @@
 import { useState, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Video, Download, Loader2, Square, ScanLine, ShieldCheck } from "lucide-react";
+import { Video, Download, Loader2, Square, ScanLine, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+
 interface ScreenRecorderProps {
-    onScanComplete?: (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => void;
-    onResultReady?: (resultId: string, result: "authentic" | "fake" | null) => void;
+  onScanComplete?: (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => void;
 }
 
-export default function ScreenRecorder({ onScanComplete, onResultReady }: ScreenRecorderProps) {
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [isScanning, setIsScanning] = useState(false);
-    const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null); // Store blob for scanning
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const chunksRef = useRef<Blob[]>([]);
-    const streamRef = useRef<MediaStream | null>(null);
-    const { toast } = useToast();
+export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) {
+  const navigate = useNavigate();
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [scanResult, setScanResult] = useState<"authentic" | "fake" | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null); // Store blob for scanning
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const { toast } = useToast();
 
-    
 
   const startRecording = async () => {
     try {
@@ -36,8 +38,8 @@ export default function ScreenRecorder({ onScanComplete, onResultReady }: Screen
       const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
         ? "video/webm;codecs=vp9"
         : MediaRecorder.isTypeSupported("video/webm")
-        ? "video/webm"
-        : "video/mp4";
+          ? "video/webm"
+          : "video/mp4";
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType,
@@ -57,11 +59,11 @@ export default function ScreenRecorder({ onScanComplete, onResultReady }: Screen
       // Handle recording stop
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType });
-    const videoUrl = URL.createObjectURL(blob);
-    setRecordedVideo(videoUrl);
-    setRecordedBlob(blob); // Store blob for scanning
-    setIsProcessing(false);
-    setIsRecording(false);
+        const videoUrl = URL.createObjectURL(blob);
+        setRecordedVideo(videoUrl);
+        setRecordedBlob(blob); // Store blob for scanning
+        setIsProcessing(false);
+        setIsRecording(false);
 
         // Stop all tracks
         if (streamRef.current) {
@@ -146,14 +148,18 @@ export default function ScreenRecorder({ onScanComplete, onResultReady }: Screen
         variant: "destructive",
       });
       return;
+
     }
 
     setIsScanning(true);
+    setScanResult(null);
 
     // Simulate scanning process (similar to Upload component)
     setTimeout(() => {
       const isFake = Math.random() > 0.5;
       const resultId = `result-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+
       const result = {
         status: isFake ? ("fake" as const) : ("authentic" as const),
         timestamp: new Date(),
@@ -165,28 +171,24 @@ export default function ScreenRecorder({ onScanComplete, onResultReady }: Screen
         onScanComplete(result);
       }
 
-      // Navigate to result page if result is fake
-      if (onResultReady && isFake) {
-        onResultReady(resultId, "fake");
-      }
-
       setIsScanning(false);
 
       toast({
-        title: isFake ? "⚠️ Deepfake Detected" : "✓ Content Authentic",
+        title: isFake ? "Deepfake Detected" : "Verified Authentic",
         description: isFake
           ? "This content appears to be manipulated"
           : "No signs of manipulation detected",
         variant: isFake ? "destructive" : "default",
-        action: isFake && onResultReady ? (
+        action:
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onResultReady(resultId, "fake")}
+            style={{ backgroundColor: "var(--primary)", color: "white" }}
+            onClick={() => (navigate(`/scan_result/${resultId}`))}
           >
             View Details
           </Button>
-        ) : undefined,
+        ,
       });
     }, 3000);
   };
@@ -198,6 +200,7 @@ export default function ScreenRecorder({ onScanComplete, onResultReady }: Screen
       setRecordedVideo(null);
     }
     setRecordedBlob(null); // Clear blob
+    setScanResult(null);
     chunksRef.current = [];
     startRecording();
   };
@@ -264,13 +267,42 @@ export default function ScreenRecorder({ onScanComplete, onResultReady }: Screen
             </div>
 
             {/* Video Preview */}
-            <div className="w-full rounded-lg overflow-hidden bg-black">
+            <div className="relative w-full rounded-lg overflow-hidden bg-black">
               <video
                 src={recordedVideo}
                 controls
                 className="w-full h-auto max-h-[60vh]"
                 autoPlay
               />
+
+              {/* Result Overlay - Same as Scanner */}
+              {scanResult && !isScanning ? (
+                <div className={`absolute inset-0 ${scanResult === "authentic" ? "bg-success/20" : "bg-destructive/20"} backdrop-blur-sm flex items-center justify-center`}>
+                  <div className="text-center space-y-4 p-6">
+                    {scanResult === "authentic" ? (
+                      <>
+                        <ShieldCheck className="w-20 h-20 text-success mx-auto" />
+                        <div>
+                          <h3 className="text-2xl font-bold text-success-foreground">Verified Authentic</h3>
+                          <p className="text-sm text-success-foreground/80 mt-2">
+                            No signs of manipulation detected
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert className="w-20 h-20 text-destructive mx-auto" />
+                        <div>
+                          <h3 className="text-2xl font-bold text-destructive-foreground">Deepfake Detected</h3>
+                          <p className="text-sm text-destructive-foreground/80 mt-2">
+                            Warning: Potential manipulation found
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {/* Action Buttons */}
