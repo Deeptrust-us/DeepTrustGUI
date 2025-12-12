@@ -75,7 +75,7 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
       setSelectedAudioFile(null);
   
       toast({
-        title: result.status === "authentic" ? "✓ Content Authentic" : "⚠️ Deepfake Detected",
+        title: result.status === "authentic" ? "Content Authentic" : "Deepfake Detected",
         description: result.status === "authentic"
           ? "No signs of manipulation detected"
           : "This content appears to be manipulated",
