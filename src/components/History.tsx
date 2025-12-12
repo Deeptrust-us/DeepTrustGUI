@@ -18,9 +18,10 @@ interface HistoryProps {
   onDelete: (id: string) => void;
   onRefresh?: () => void;
   isLoading?: boolean;
+  embedded?: boolean;
 }
 
-export function History({ items, onDelete, onRefresh, isLoading = false }: HistoryProps) {
+export function History({ items, onDelete, onRefresh, isLoading = false, embedded = false }: HistoryProps) {
   const navigate = useNavigate();
 
   // Helper function to combine date and hour into a Date object
@@ -35,9 +36,15 @@ export function History({ items, onDelete, onRefresh, isLoading = false }: Histo
     }
   };
 
+  const emptyStateWrapperClass = embedded
+    ? "flex flex-col items-center justify-center min-h-[16rem] p-4"
+    : "flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4";
+
+  const scrollAreaHeightClass = embedded ? "h-[28rem] md:h-[32rem]" : "h-[calc(100vh-12rem)]";
+
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
+      <div className={emptyStateWrapperClass}>
         <div className="text-center space-y-4 max-w-md">
           <Loader2 className="w-16 h-16 text-muted-foreground mx-auto animate-spin" />
           <div>
@@ -53,7 +60,7 @@ export function History({ items, onDelete, onRefresh, isLoading = false }: Histo
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
+      <div className={emptyStateWrapperClass}>
         <div className="text-center space-y-4 max-w-md">
           <Clock className="w-16 h-16 text-muted-foreground mx-auto" />
           <div>
@@ -78,7 +85,7 @@ export function History({ items, onDelete, onRefresh, isLoading = false }: Histo
   }
 
   return (
-    <div className="p-4 pb-20">
+    <div className={embedded ? "p-4" : "p-4 pb-20"}>
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -101,7 +108,7 @@ export function History({ items, onDelete, onRefresh, isLoading = false }: Histo
           )}
         </div>
 
-        <ScrollArea className="h-[calc(100vh-12rem)]">
+        <ScrollArea className={scrollAreaHeightClass}>
           <div className="space-y-3">
             {items.map((item) => {
               const isAuthentic = !item.is_deepfake;

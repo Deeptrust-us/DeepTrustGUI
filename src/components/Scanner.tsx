@@ -14,9 +14,10 @@ type CaptureMode = "camera" | "audio";
 
 interface ScannerProps {
   onScanComplete: (result: { status: ScanResult; timestamp: Date; resultId?: string }) => void;
+  embedded?: boolean;
 }
 
-export default function Scanner({ onScanComplete }: ScannerProps) {
+export default function Scanner({ onScanComplete, embedded = false }: ScannerProps) {
 
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [scanResult, setScanResult] = useState<ScanResult>(null);
@@ -324,12 +325,17 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           </Button>
         ) : undefined,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Scan error:", error);
   
-      const errorMessage = error.response?.data?.message
-        || error.message
-        || "Could not analyze content. Please try again.";
+      const apiMessage =
+        typeof error === "object" && error
+          ? (error as { response?: { data?: { message?: unknown } } }).response?.data?.message
+          : undefined;
+      const errorMessage =
+        (typeof apiMessage === "string" && apiMessage.trim() ? apiMessage : undefined) ||
+        (error instanceof Error ? error.message : undefined) ||
+        "Could not analyze content. Please try again.";
   
       toast({
         title: "Scan failed",
@@ -386,8 +392,12 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
         : "ring-2 ring-destructive/40 border-destructive/30"
       : "";
 
+  const wrapperClass = embedded
+    ? "flex flex-col items-center justify-center w-full space-y-6"
+    : "flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4 space-y-6";
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4 space-y-6">
+    <div className={wrapperClass}>
       {/* Mode Selector */}
       <Tabs value={captureMode} onValueChange={(value) => setCaptureMode(value as CaptureMode)} className="w-full max-w-md">
         <TabsList className="grid w-full grid-cols-2">

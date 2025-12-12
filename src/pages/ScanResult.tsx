@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Brain, ShieldCheck, ShieldAlert, ArrowLeft } from "lucide-react";
+import { Brain, ShieldCheck, ShieldAlert } from "lucide-react";
 import { logApi } from "@/api/handling/apiLogHandling";
 
 type DetectionLog = {
@@ -183,19 +183,8 @@ const ScanResult = () => {
       </div>
 
       {/* Navigation Buttons */}
-      <div className="flex gap-4">
-        <Button
-          onClick={() => navigate("/main")}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Scanner
-        </Button>
-        <Button
-          onClick={() => navigate("/")}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
+      <div className="flex">
+        <Button onClick={() => navigate("/")} className="bg-blue-600 hover:bg-blue-700 text-white">
           Back to Home
         </Button>
       </div>

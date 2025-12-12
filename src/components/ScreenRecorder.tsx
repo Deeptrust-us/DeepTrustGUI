@@ -9,9 +9,10 @@ import { videoDetection } from "@/api/video/videoDetection";
 
 interface ScreenRecorderProps {
   onScanComplete?: (result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => void;
+  embedded?: boolean;
 }
 
-export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) {
+export default function ScreenRecorder({ onScanComplete, embedded = false }: ScreenRecorderProps) {
   const navigate = useNavigate();
   const [isRecording, setIsRecording] = useState(false);
   const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
@@ -256,12 +257,17 @@ export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) 
           </Button>
         ) : undefined,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Scan error:", error);
 
-      const errorMessage = error.response?.data?.message
-        || error.message
-        || "Could not analyze video. Please try again.";
+      const apiMessage =
+        typeof error === "object" && error
+          ? (error as { response?: { data?: { message?: unknown } } }).response?.data?.message
+          : undefined;
+      const errorMessage =
+        (typeof apiMessage === "string" && apiMessage.trim() ? apiMessage : undefined) ||
+        (error instanceof Error ? error.message : undefined) ||
+        "Could not analyze video. Please try again.";
 
       toast({
         title: "Scan failed",
@@ -287,9 +293,15 @@ export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) 
     startRecording();
   };
 
+  const wrapperClass = embedded
+    ? "flex flex-col items-center justify-center w-full space-y-6"
+    : "flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4 space-y-6";
+
+  const cardClass = embedded ? "w-full max-w-2xl p-6 border-0 shadow-none bg-transparent" : "w-full max-w-2xl p-6";
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4 space-y-6">
-      <Card className="w-full max-w-2xl p-6">
+    <div className={wrapperClass}>
+      <Card className={cardClass}>
         {!recordedVideo && !isRecording && (
           <div className="text-center space-y-4">
             <Video className="w-16 h-16 mx-auto text-muted-foreground" />
