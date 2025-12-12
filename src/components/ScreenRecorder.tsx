@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate} from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Video, Download, Loader2, Square, ScanLine, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { videoDetection } from "@/api/video/videoDetection";
 
 
 interface ScreenRecorderProps {
@@ -148,49 +149,62 @@ export default function ScreenRecorder({ onScanComplete }: ScreenRecorderProps) 
         variant: "destructive",
       });
       return;
-
     }
 
     setIsScanning(true);
     setScanResult(null);
 
-    // Simulate scanning process (similar to Upload component)
-    setTimeout(() => {
-      const isFake = Math.random() > 0.5;
-      const resultId = `result-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    try {
+      // Send the video blob to the backend
+      const response = await videoDetection.postVideo(recordedBlob);
+      const result = response.data;
 
-
-      const result = {
-        status: isFake ? ("fake" as const) : ("authentic" as const),
-        timestamp: new Date(),
-        resultId: resultId,
-      };
+      // Set the scan result based on API response
+      setScanResult(result.status === "authentic" ? "authentic" : "fake");
 
       // Call the scan complete handler
       if (onScanComplete) {
-        onScanComplete(result);
+        onScanComplete({
+          status: result.status === "authentic" ? "authentic" : "fake",
+          timestamp: new Date(),
+          resultId: result.resultId || result.id || `result-${Date.now()}`,
+        });
       }
 
-      setIsScanning(false);
-
       toast({
-        title: isFake ? "Deepfake Detected" : "Verified Authentic",
-        description: isFake
-          ? "This content appears to be manipulated"
-          : "No signs of manipulation detected",
-        variant: isFake ? "destructive" : "default",
-        action:
+        title: result.status === "authentic" ? "Verified Authentic" : "Deepfake Detected",
+        description: result.status === "authentic"
+          ? "No signs of manipulation detected"
+          : "This content appears to be manipulated",
+        variant: result.status === "authentic" ? "default" : "destructive",
+        action: (
           <Button
             variant="outline"
             size="sm"
             style={{ backgroundColor: "var(--primary)", color: "white" }}
-            onClick={() => (navigate(`/scan_result/${resultId}`))}
+            onClick={() => navigate(`/scan_result/${result.resultId || result.id || `result-${Date.now()}`}`)}
           >
             View Details
           </Button>
-        ,
+        ),
       });
-    }, 3000);
+    } catch (error: any) {
+      console.error("Scan error:", error);
+
+      const errorMessage = error.response?.data?.message
+        || error.message
+        || "Could not analyze video. Please try again.";
+
+      toast({
+        title: "Scan failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+
+      setScanResult(null);
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const startNewRecording = () => {

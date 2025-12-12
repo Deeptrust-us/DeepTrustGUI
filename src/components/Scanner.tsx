@@ -17,6 +17,7 @@ interface ScannerProps {
 }
 
 export default function Scanner({ onScanComplete }: ScannerProps) {
+
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -329,7 +330,7 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
 
       <Card className="relative w-full max-w-md aspect-[3/4] overflow-hidden bg-card shadow-scanner">
         {/* Live Video Preview (only when recording or idle) */}
-        {captureMode === "camera" && scanStatus !== "recorded" && (
+        {captureMode === "camera" && scanStatus !== "recorded" && scanStatus !== "scanning" && scanStatus !== "complete" && (
           <video
             ref={videoRef}
             autoPlay
@@ -339,7 +340,6 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           />
         )}
 
-        {/* Audio-only visualization (only when recording or idle) */}
         {/* Audio-only visualization (only when idle, not when recording) */}
         {captureMode === "audio" && hasPermissions && scanStatus === "idle" && (
           <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-primary/20 to-primary/5">
@@ -354,27 +354,25 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           </div>
         )}
 
+        {/* Recorded Video Preview - Keep it visible during scanning and after */}
+        {scanStatus === "recorded" && recordedVideo && captureMode === "camera" && (
+          <video
+            src={recordedVideo}
+            controls
+            className="absolute inset-0 w-full h-full object-cover"
+            autoPlay
+          />
+        )}
 
-        {/* Recorded Video/Audio Preview */}
-        {scanStatus === "recorded" && recordedVideo && (
-          <>
-            {captureMode === "camera" ? (
-              <video
-                src={recordedVideo}
-                controls
-                className="absolute inset-0 w-full h-full object-cover"
-                autoPlay
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-primary/20 to-primary/5">
-                <div className="text-center space-y-4">
-                  <Mic className="w-20 h-20 text-primary" />
-                  <p className="text-sm font-medium text-primary">Audio Recording</p>
-                  <audio src={recordedVideo} controls className="w-full max-w-xs" />
-                </div>
-              </div>
-            )}
-          </>
+        {/* Recorded Audio Preview */}
+        {scanStatus === "recorded" && recordedVideo && captureMode === "audio" && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-primary/20 to-primary/5">
+            <div className="text-center space-y-4">
+              <Mic className="w-20 h-20 text-primary" />
+              <p className="text-sm font-medium text-primary">Audio Recording</p>
+              <audio src={recordedVideo} controls className="w-full max-w-xs" />
+            </div>
+          </div>
         )}
 
         {/* Overlay when no permissions */}
@@ -398,7 +396,6 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           </div>
         )}
 
-        {/* Recording Overlay */}
         {/* Recording Overlay - Shows for both video and audio */}
         {scanStatus === "recording" && (
           <div className="absolute inset-0 bg-red-500/10 backdrop-blur-[1px]">
@@ -412,12 +409,11 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           </div>
         )}
 
-
-        {/* Scanning Overlay */}
+        {/* Scanning Overlay - Appears over the recorded video */}
         {scanStatus === "scanning" && (
-          <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px]">
-            <div className="absolute inset-0 border-2 border-primary animate-scan-pulse" />
-            <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-scan-line" />
+          <div className="absolute inset-0 bg-primary/10 backdrop-blur-[1px] z-10">
+            <div className="absolute inset-0 border-2 border-primary animate-pulse" />
+            <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse" />
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center space-y-2">
                 <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
@@ -427,9 +423,9 @@ export default function Scanner({ onScanComplete }: ScannerProps) {
           </div>
         )}
 
-        {/* Result Overlay */}
+        {/* Result Overlay - Appears over the recorded video after scanning */}
         {scanStatus === "complete" && scanResult && (
-          <div className={`absolute inset-0 ${scanResult === "authentic" ? "bg-success/20" : "bg-destructive/20"} backdrop-blur-sm flex items-center justify-center`}>
+          <div className={`absolute inset-0 ${scanResult === "authentic" ? "bg-success/20" : "bg-destructive/20"} backdrop-blur-sm flex items-center justify-center z-10`}>
             <div className="text-center space-y-4 p-6">
               {scanResult === "authentic" ? (
                 <>
