@@ -1,16 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { videoDetection } from "@/api/video/videoDetection";
 import { audioDetection } from "@/api/audio/audioDetection";
+import { imageDetection } from "../api/image/imageDetection";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Square, ScanLine } from "lucide-react";
+import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Square, ScanLine, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type ScanStatus = "idle" | "recording" | "recorded" | "scanning" | "complete";
 type ScanResult = "authentic" | "fake" | null;
-type CaptureMode = "camera" | "audio";
+type CaptureMode = "video" | "audio" | "photo";
 
 interface ScannerProps {
   onScanComplete: (result: { status: ScanResult; timestamp: Date; resultId?: string }) => void;
@@ -23,9 +24,11 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [lastAnalysis, setLastAnalysis] = useState<{ classification?: string; score?: number | null } | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [hasPermissions, setHasPermissions] = useState(false);
-  const [captureMode, setCaptureMode] = useState<CaptureMode>("camera");
+  const [captureMode, setCaptureMode] = useState<CaptureMode>("video");
   const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
+  const [recordedImage, setRecordedImage] = useState<string | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const navigate = useNavigate();
@@ -73,11 +76,10 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
 
   useEffect(() => {
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      const s = streamRef.current;
+      if (s) s.getTracks().forEach((track) => track.stop());
     };
-  }, [stream]);
+  }, []);
 
   const requestCameraPermissions = async () => {
     try {
@@ -92,11 +94,12 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
       }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: true,
+        video: { facingMode: captureMode === "photo" ? "environment" : "user" },
+        audio: captureMode === "video",
       });
 
       setStream(mediaStream);
+      streamRef.current = mediaStream;
       setHasPermissions(true);
 
       if (videoRef.current) {
@@ -105,7 +108,7 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
 
       toast({
         title: "Access granted",
-        description: "Camera and microphone are ready",
+        description: captureMode === "photo" ? "Camera is ready" : "Camera and microphone are ready",
       });
     } catch (error) {
       console.error("Camera access error:", error);
@@ -140,6 +143,7 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
       });
 
       setStream(mediaStream);
+      streamRef.current = mediaStream;
       setHasPermissions(true);
 
       toast({
@@ -156,11 +160,67 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
   };
 
   const requestPermissions = async () => {
-    if (captureMode === "camera") {
+    if (captureMode === "video" || captureMode === "photo") {
       await requestCameraPermissions();
     } else if (captureMode === "audio") {
       await requestAudioPermissions();
     }
+  };
+
+  const takePhoto = async () => {
+    if (!hasPermissions) {
+      await requestPermissions();
+      return;
+    }
+
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) {
+      toast({
+        title: "Capture failed",
+        description: "Camera stream not ready yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      toast({
+        title: "Capture failed",
+        description: "Could not capture image.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    ctx.drawImage(video, 0, 0, w, h);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) {
+      toast({
+        title: "Capture failed",
+        description: "Could not encode captured image.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (recordedImage) URL.revokeObjectURL(recordedImage);
+    const url = URL.createObjectURL(blob);
+    setRecordedImage(url);
+    setRecordedVideo(null);
+    setRecordedBlob(blob);
+    setScanStatus("recorded");
+
+    toast({
+      title: "Photo captured",
+      description: "Your photo is ready for analysis",
+    });
   };
 
   const startRecording = async () => {
@@ -173,7 +233,7 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
 
     try {
       // Determine MIME type based on mode
-      const mimeType = captureMode === "camera"
+      const mimeType = captureMode === "video"
         ? (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
           ? "video/webm;codecs=vp9"
           : MediaRecorder.isTypeSupported("video/webm")
@@ -187,7 +247,7 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: captureMode === "camera" ? 2500000 : undefined,
+        videoBitsPerSecond: captureMode === "video" ? 2500000 : undefined,
         audioBitsPerSecond: 128000,
       });
 
@@ -204,6 +264,8 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
         const blob = new Blob(chunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         setRecordedVideo(url);
+        if (recordedImage) URL.revokeObjectURL(recordedImage);
+        setRecordedImage(null);
         setRecordedBlob(blob);
         setScanStatus("recorded");
         setIsProcessing(false);
@@ -253,7 +315,7 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
     if (!recordedBlob) {
       toast({
         title: "No recording to scan",
-        description: "Please record content first",
+        description: captureMode === "photo" ? "Please take a photo first" : "Please record content first",
         variant: "destructive",
       });
       return;
@@ -264,9 +326,12 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
   
     try {
       // Send the blob to backend based on capture mode
-      const response = captureMode === "camera"
-        ? await videoDetection.postVideo(recordedBlob)
-        : await audioDetection.postAudio(recordedBlob);
+      const response =
+        captureMode === "video"
+          ? await videoDetection.postVideo(recordedBlob)
+          : captureMode === "audio"
+            ? await audioDetection.postAudio(recordedBlob)
+            : await imageDetection.postImage(recordedBlob);
   
       const result = response.data;
       const logId = toNumericId(result?.resultId ?? result?.id);
@@ -351,35 +416,40 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
     setScanStatus("idle");
     setScanResult(null);
     setRecordedVideo(null);
+    setRecordedImage(null);
     setRecordedBlob(null);
 
     // Stop current stream
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-      setHasPermissions(false);
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
+    const s = streamRef.current;
+    if (s) s.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setStream(null);
+    setHasPermissions(false);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
 
     // Clean up recorded video URL
     if (recordedVideo) {
       URL.revokeObjectURL(recordedVideo);
     }
+    if (recordedImage) {
+      URL.revokeObjectURL(recordedImage);
+    }
   };
 
   // Reset when switching modes
   useEffect(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-      setHasPermissions(false);
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
+    const s = streamRef.current;
+    if (s) s.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setStream(null);
+    setHasPermissions(false);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     setRecordedVideo(null);
+    setRecordedImage(null);
     setRecordedBlob(null);
     setScanResult(null);
     setScanStatus("idle");
@@ -400,8 +470,8 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
     <div className={wrapperClass}>
       {/* Mode Selector */}
       <Tabs value={captureMode} onValueChange={(value) => setCaptureMode(value as CaptureMode)} className="w-full max-w-md">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="camera" className="gap-2">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="video" className="gap-2">
             <Camera className="w-4 h-4" />
             Video
           </TabsTrigger>
@@ -409,12 +479,19 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
             <Mic className="w-4 h-4" />
             Audio
           </TabsTrigger>
+          <TabsTrigger value="photo" className="gap-2">
+            <ImageIcon className="w-4 h-4" />
+            Photo
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
       <Card className={`relative w-full max-w-md aspect-[3/4] overflow-hidden bg-card shadow-scanner ${themedCardClass}`}>
         {/* Live Video Preview (only when recording or idle) */}
-        {captureMode === "camera" && scanStatus !== "recorded" && scanStatus !== "scanning" && scanStatus !== "complete" && (
+        {(captureMode === "video" || captureMode === "photo") &&
+          scanStatus !== "recorded" &&
+          scanStatus !== "scanning" &&
+          scanStatus !== "complete" && (
           <video
             ref={videoRef}
             autoPlay
@@ -439,13 +516,17 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
         )}
 
         {/* Recorded Video Preview - Keep it visible during scanning and after */}
-        {scanStatus === "recorded" && recordedVideo && captureMode === "camera" && (
+        {scanStatus === "recorded" && recordedVideo && captureMode === "video" && (
           <video
             src={recordedVideo}
             controls
             className="absolute inset-0 w-full h-full object-cover"
             autoPlay
           />
+        )}
+
+        {scanStatus === "recorded" && recordedImage && captureMode === "photo" && (
+          <img src={recordedImage} alt="Captured photo" className="absolute inset-0 w-full h-full object-cover" />
         )}
 
         {/* Recorded Audio Preview */}
@@ -463,18 +544,22 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
         {!hasPermissions && scanStatus === "idle" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/95 backdrop-blur-sm">
             <div className="flex gap-4 mb-4">
-              {captureMode === "camera" ? (
+              {captureMode === "video" ? (
                 <>
                   <Camera className="w-12 h-12 text-muted-foreground" />
                   <Mic className="w-12 h-12 text-muted-foreground" />
                 </>
+              ) : captureMode === "photo" ? (
+                <Camera className="w-12 h-12 text-muted-foreground" />
               ) : (
                 <Mic className="w-12 h-12 text-muted-foreground" />
               )}
             </div>
             <p className="text-sm text-muted-foreground text-center px-6">
-              {captureMode === "camera"
+              {captureMode === "video"
                 ? "Camera and microphone access required"
+                : captureMode === "photo"
+                  ? "Camera access required"
                 : "Microphone access required for audio recording"}
             </p>
           </div>
@@ -554,16 +639,21 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
       {/* Control Buttons */}
       {scanStatus === "idle" && (
         <Button
-          onClick={startRecording}
+          onClick={captureMode === "photo" ? takePhoto : startRecording}
           size="lg"
           className="w-full max-w-md h-14 bg-gradient-primary hover:opacity-90 text-white font-semibold text-lg shadow-glow"
         >
           {hasPermissions ? (
             <>
-              {captureMode === "camera" ? (
+              {captureMode === "video" ? (
                 <>
                   <Camera className="w-5 h-5 mr-2" />
                   Start Recording
+                </>
+              ) : captureMode === "photo" ? (
+                <>
+                  <ImageIcon className="w-5 h-5 mr-2" />
+                  Take Photo
                 </>
               ) : (
                 <>
@@ -574,10 +664,15 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
             </>
           ) : (
             <>
-              {captureMode === "camera" ? (
+              {captureMode === "video" ? (
                 <>
                   <Camera className="w-5 h-5 mr-2" />
                   Enable Camera & Mic
+                </>
+              ) : captureMode === "photo" ? (
+                <>
+                  <Camera className="w-5 h-5 mr-2" />
+                  Enable Camera
                 </>
               ) : (
                 <>

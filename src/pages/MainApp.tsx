@@ -3,16 +3,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Scanner from "@/components/Scanner";
 import { Upload } from "@/components/Upload";
 import { History } from "@/components/History";
-import { ScanLine, Upload as UploadIcon, Video, History as HistoryIcon } from "lucide-react";
+import { ClipboardPaste, ScanLine, Upload as UploadIcon, Video, History as HistoryIcon } from "lucide-react";
 import ScreenRecorder from "@/components/ScreenRecorder";
 import { logApi } from "@/api/handling/apiLogHandling";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { DemoMenu, type DemoRequest } from "@/components/DemoMenu";
+import ImageAnalyzer from "../components/ImageAnalyzer";
 
 type HistoryItem = { id: number; is_deepfake: boolean; date: string; hour: string };
 
-type Mode = "scanner" | "screen" | "upload";
+type Mode = "scanner" | "screen" | "upload" | "paste";
 
 const MainApp = () => {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
@@ -171,6 +172,10 @@ const MainApp = () => {
                   <UploadIcon className="w-4 h-4" />
                   Upload
                 </TabsTrigger>
+                <TabsTrigger value="paste" className="rounded-full px-5 gap-2">
+                  <ClipboardPaste className="w-4 h-4" />
+                  Paste
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -190,6 +195,9 @@ const MainApp = () => {
                       demoRequest={demoRequest}
                       onDemoConsumed={() => setDemoRequest(null)}
                     />
+                  </TabsContent>
+                  <TabsContent value="paste" className="m-0">
+                    <ImageAnalyzer onScanComplete={handleScanComplete} embedded />
                   </TabsContent>
                 </div>
               </div>
