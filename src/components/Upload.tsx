@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload as UploadIcon, Loader2, Mic, Video, Image as ImageIcon } from "lucide-react";
+import { Upload as UploadIcon, Loader2, Mic, Video, Image as ImageIcon, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { videoDetection } from "@/api/video/videoDetection";
 import { audioDetection } from "@/api/audio/audioDetection";
@@ -26,6 +26,9 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
   const [contentUrl, setContentUrl] = useState("");
   const [activeDemo, setActiveDemo] = useState<Pick<DemoRequest, "id" | "kind" | "label" | "filename"> | null>(null);
   const navigate = useNavigate();
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const toNumericId = (value: unknown): number | null => {
     if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -272,6 +275,17 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
     setSelectedImageFile(null);
   };
 
+  const clearSelection = () => {
+    setSelectedVideoFile(null);
+    setSelectedAudioFile(null);
+    setSelectedImageFile(null);
+    setContentUrl("");
+
+    if (videoInputRef.current) videoInputRef.current.value = "";
+    if (audioInputRef.current) audioInputRef.current.value = "";
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
   const handleUrlScan = async () => {
     if (!contentUrl.trim()) {
       toast({
@@ -369,67 +383,109 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
               <CardDescription>Upload a video, audio, or image file to check for deepfakes</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
-                <div className="flex items-center gap-3 mb-4">
-                  <Video className="w-8 h-8 text-muted-foreground" />
-                  <div>
-                    <h3 className="font-semibold text-foreground">Video File</h3>
-                    <p className="text-xs text-muted-foreground">Upload video files (MP4, WebM, etc.)</p>
+              {selectedFile && selectedKind ? (
+                <>
+                  <div className="rounded-lg border border-border bg-muted/30 p-4">
+                    {previewUrl && selectedKind === "video" && (
+                      <div className="w-full max-h-[420px] overflow-hidden rounded-md bg-black flex items-center justify-center">
+                        <video src={previewUrl} controls className="max-h-[420px] max-w-full w-auto h-auto object-contain" />
+                      </div>
+                    )}
+                    {previewUrl && selectedKind === "audio" && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Mic className="w-4 h-4" />
+                          {selectedFile.name}
+                        </div>
+                        <audio src={previewUrl} controls className="w-full" />
+                      </div>
+                    )}
+                    {previewUrl && selectedKind === "image" && (
+                      <div className="w-full max-h-[420px] overflow-hidden rounded-md bg-black flex items-center justify-center">
+                        <img src={previewUrl} alt={selectedFile.name} className="max-h-[420px] max-w-full w-auto h-auto object-contain" />
+                      </div>
+                    )}
+                    {!previewUrl && <div className="text-sm text-muted-foreground">Loading preview…</div>}
                   </div>
-                </div>
-                <Input
-                  type="file"
-                  accept="video/*"
-                  onChange={handleVideoFileChange}
-                  className="mb-2"
-                  disabled={isScanning}
-                />
-                {selectedVideoFile && <p className="text-sm text-muted-foreground">Selected: {selectedVideoFile.name}</p>}
-              </div>
 
-              <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
-                <div className="flex items-center gap-3 mb-4">
-                  <Mic className="w-8 h-8 text-muted-foreground" />
-                  <div>
-                    <h3 className="font-semibold text-foreground">Audio File</h3>
-                    <p className="text-xs text-muted-foreground">Upload audio files (MP3, WAV, WebM, etc.)</p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button onClick={handleFileUpload} disabled={!selectedFile || isScanning} className="w-full sm:flex-1" size="lg">
+                      {isScanning ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Scanning...
+                        </>
+                      ) : (
+                        <>
+                          <UploadIcon className="w-4 h-4 mr-2" />
+                          Scan File
+                        </>
+                      )}
+                    </Button>
+
+                    <Button type="button" variant="outline" size="lg" onClick={clearSelection} disabled={isScanning} className="w-full sm:w-auto">
+                      <X className="w-4 h-4 mr-2" />
+                      Clean
+                    </Button>
                   </div>
-                </div>
-                <Input
-                  type="file"
-                  accept="audio/*"
-                  onChange={handleAudioFileChange}
-                  className="mb-2"
-                  disabled={isScanning}
-                />
-                {selectedAudioFile && <p className="text-sm text-muted-foreground">Selected: {selectedAudioFile.name}</p>}
-              </div>
-
-              <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
-                <div className="flex items-center gap-3 mb-4">
-                  <ImageIcon className="w-8 h-8 text-muted-foreground" />
-                  <div>
-                    <h3 className="font-semibold text-foreground">Image File</h3>
-                    <p className="text-xs text-muted-foreground">Upload image files (PNG, JPG, WebP, etc.)</p>
+                </>
+              ) : (
+                <>
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Video className="w-8 h-8 text-muted-foreground" />
+                      <div>
+                        <h3 className="font-semibold text-foreground">Video File</h3>
+                        <p className="text-xs text-muted-foreground">Upload video files (MP4, WebM, etc.)</p>
+                      </div>
+                    </div>
+                    <Input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoFileChange}
+                      className="mb-2"
+                      disabled={isScanning}
+                    />
                   </div>
-                </div>
-                <Input type="file" accept="image/*" onChange={handleImageFileChange} className="mb-2" disabled={isScanning} />
-                {selectedImageFile && <p className="text-sm text-muted-foreground">Selected: {selectedImageFile.name}</p>}
-              </div>
 
-              <Button onClick={handleFileUpload} disabled={!selectedFile || isScanning} className="w-full" size="lg">
-                {isScanning ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Scanning...
-                  </>
-                ) : (
-                  <>
-                    <UploadIcon className="w-4 h-4 mr-2" />
-                    Scan File
-                  </>
-                )}
-              </Button>
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Mic className="w-8 h-8 text-muted-foreground" />
+                      <div>
+                        <h3 className="font-semibold text-foreground">Audio File</h3>
+                        <p className="text-xs text-muted-foreground">Upload audio files (MP3, WAV, WebM, etc.)</p>
+                      </div>
+                    </div>
+                    <Input
+                      ref={audioInputRef}
+                      type="file"
+                      accept="audio/*"
+                      onChange={handleAudioFileChange}
+                      className="mb-2"
+                      disabled={isScanning}
+                    />
+                  </div>
+
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
+                    <div className="flex items-center gap-3 mb-4">
+                      <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                      <div>
+                        <h3 className="font-semibold text-foreground">Image File</h3>
+                        <p className="text-xs text-muted-foreground">Upload image files (PNG, JPG, WebP, etc.)</p>
+                      </div>
+                    </div>
+                    <Input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileChange}
+                      className="mb-2"
+                      disabled={isScanning}
+                    />
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
