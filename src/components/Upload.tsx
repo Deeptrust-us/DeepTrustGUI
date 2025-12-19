@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload as UploadIcon, Link as LinkIcon, FileVideo, Loader2, Mic, Video } from "lucide-react";
+import { Upload as UploadIcon, Loader2, Mic, Video, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { videoDetection } from "@/api/video/videoDetection";
 import { audioDetection } from "@/api/audio/audioDetection";
+import { imageDetection } from "@/api/image/imageDetection";
 
 interface UploadProps {
   onScanComplete: (result: { status: "authentic" | "fake" | null; timestamp: Date }) => void;
@@ -15,11 +16,12 @@ interface UploadProps {
 
 export const Upload = ({ onScanComplete }: UploadProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+
   const [isScanning, setIsScanning] = useState(false);
   const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
   const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null);
-  const [contentUrl, setContentUrl] = useState("");
-  const navigate = useNavigate();
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
 
   const toNumericId = (value: unknown): number | null => {
     if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -43,16 +45,13 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
   const formatMaybePercent = (value: unknown): string | null => {
     if (value === null || value === undefined) return null;
     if (typeof value === "number" && Number.isFinite(value)) {
-      // Backend already returns a client-friendly 0..100 score.
       return `${value.toFixed(2)}%`;
     }
     if (typeof value === "string") {
       const trimmed = value.trim();
       if (!trimmed) return null;
       const numeric = Number(trimmed.replace("%", ""));
-      if (Number.isFinite(numeric)) {
-        return `${numeric.toFixed(2)}%`;
-      }
+      if (Number.isFinite(numeric)) return `${numeric.toFixed(2)}%`;
       return trimmed;
     }
     return null;
@@ -60,50 +59,46 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
 
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedVideoFile(file);
-      setSelectedAudioFile(null); // Clear audio selection when video is selected
-    }
+    if (!file) return;
+    setSelectedVideoFile(file);
+    setSelectedAudioFile(null);
+    setSelectedImageFile(null);
   };
 
   const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedAudioFile(file);
-      setSelectedVideoFile(null); // Clear video selection when audio is selected
-    }
+    if (!file) return;
+    setSelectedAudioFile(file);
+    setSelectedVideoFile(null);
+    setSelectedImageFile(null);
   };
 
-  const handleFileUpload = async () => {
-    const selectedFile = selectedVideoFile || selectedAudioFile;
-    
-    if (!selectedFile) {
-      toast({
-        title: "No file selected",
-        description: "Please select a video or audio file to scan",
-        variant: "destructive",
-      });
-      return;
-    }
-  
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedImageFile(file);
+    setSelectedVideoFile(null);
+    setSelectedAudioFile(null);
+  };
+
+  const scanBlob = async (fileBlob: Blob, kind: "audio" | "video" | "image") => {
     setIsScanning(true);
-  
+
     try {
-      // Determine if it's audio or video based on which file is selected
-      const isAudio = !!selectedAudioFile;
-      
-      // Convert File to Blob (File is already a Blob, but we ensure it's the right type)
-      const fileBlob = selectedFile;
-  
-      // Call the appropriate API
-      const response = isAudio
-        ? await audioDetection.postAudio(fileBlob)
-        : await videoDetection.postVideo(fileBlob);
-  
-      const result = response.data;
-      const logId = toNumericId(result?.resultId ?? result?.id);
-      const status: "authentic" | "fake" | null =
-        result?.status ?? toStatusFromClassification(result?.classification);
+      const response =
+        kind === "audio"
+          ? await audioDetection.postAudio(fileBlob)
+          : kind === "video"
+            ? await videoDetection.postVideo(fileBlob)
+            : await imageDetection.postImage(fileBlob);
+
+      const result: unknown = response.data;
+      const obj = typeof result === "object" && result ? (result as Record<string, unknown>) : null;
+      const maybeId = obj ? (obj.resultId ?? obj.id) : undefined;
+      const logId = toNumericId(maybeId);
+      const classification = obj ? obj.classification : undefined;
+      const statusFromPayload = obj && (obj.status === "authentic" || obj.status === "fake") ? obj.status : null;
+      const status: "authentic" | "fake" | null = statusFromPayload ?? toStatusFromClassification(classification);
 
       const verdictText =
         status === "fake"
@@ -113,113 +108,95 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
             : "Result received.";
 
       const detailsParts: string[] = [];
-      const scoreText = formatMaybePercent(
-        result?.score
-      );
+      const scoreText = formatMaybePercent(obj ? obj.score : undefined);
       if (scoreText) detailsParts.push(`Score: ${scoreText}`);
-      if (typeof result?.classification === "string" && result.classification.trim()) {
-        detailsParts.push(`Classification: ${result.classification}`);
+      if (typeof classification === "string" && classification.trim()) {
+        detailsParts.push(`Classification: ${classification}`);
       }
       if (logId !== null) detailsParts.push(`Log #${logId}`);
-  
-      onScanComplete({
-        status,
-        timestamp: new Date(),
-      });
-  
-      setIsScanning(false);
+
+      onScanComplete({ status, timestamp: new Date() });
+
       setSelectedVideoFile(null);
       setSelectedAudioFile(null);
-  
+      setSelectedImageFile(null);
+
       toast({
         title:
-          typeof result?.classification === "string" && result.classification.trim()
-            ? result.classification
+          typeof classification === "string" && classification.trim()
+            ? classification
             : status === "authentic"
               ? "Bonafide"
               : "Deepfake",
-        description:
-          detailsParts.length > 0
-            ? `${verdictText} ${detailsParts.join(" • ")}`
-            : verdictText,
+        description: detailsParts.length > 0 ? `${verdictText} ${detailsParts.join(" • ")}` : verdictText,
         variant: status === "fake" ? "destructive" : "success",
-        action: logId !== null ? (
-          <Button
-            variant="outline"
-            size="sm"
-            style={{ backgroundColor: "var(--primary)", color: "black" }}
-            onClick={() => navigate(`/scan_result/${logId}`)}
-          >
-            View Details
-          </Button>
-        ) : undefined,
+        action:
+          logId !== null ? (
+            <Button
+              variant="outline"
+              size="sm"
+              style={{ backgroundColor: "var(--primary)", color: "black" }}
+              onClick={() => navigate(`/scan_result/${logId}`)}
+            >
+              View Details
+            </Button>
+          ) : undefined,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Scan error:", error);
-  
-      const errorMessage = error.response?.data?.message
-        || error.message
-        || "Could not analyze content. Please try again.";
-  
+
+      const apiMessage =
+        typeof error === "object" && error ? (error as { response?: { data?: { message?: unknown } } }).response?.data?.message : undefined;
+      const errorMessage =
+        (typeof apiMessage === "string" && apiMessage.trim() ? apiMessage : undefined) ||
+        (error instanceof Error ? error.message : undefined) ||
+        "Could not analyze content. Please try again.";
+
       toast({
         title: "Scan failed",
         description: errorMessage,
         variant: "destructive",
       });
-  
+    } finally {
       setIsScanning(false);
     }
   };
 
-  const handleUrlScan = async () => {
-    if (!contentUrl.trim()) {
+  const handleFileUpload = async () => {
+    const selectedFile = selectedVideoFile || selectedAudioFile || selectedImageFile;
+
+    if (!selectedFile) {
       toast({
-        title: "No URL provided",
-        description: "Please enter a URL to scan",
+        title: "No file selected",
+        description: "Please select a video, audio, or image file to scan",
         variant: "destructive",
       });
       return;
     }
 
-    setIsScanning(true);
-
-    // URL scanning is currently not wired to a backend endpoint.
-    // The URL tab is also disabled in the UI, so we avoid fake/random results here.
-    toast({
-      title: "URL scan not available",
-      description: "URL/Link scanning isn't implemented. Please use Upload File or Recorder instead.",
-      variant: "destructive",
-    });
-
-    setIsScanning(false);
+    const kind: "audio" | "video" | "image" = selectedAudioFile ? "audio" : selectedVideoFile ? "video" : "image";
+    await scanBlob(selectedFile, kind);
   };
 
-  const selectedFile = selectedVideoFile || selectedAudioFile;
+  const selectedFile = selectedVideoFile || selectedAudioFile || selectedImageFile;
 
   return (
     <div className="container mx-auto px-4 py-8">
       <Tabs defaultValue="file" className="w-full max-w-2xl mx-auto">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-1">
           <TabsTrigger value="file" className="gap-2">
             <UploadIcon className="w-4 h-4" />
             Upload File
           </TabsTrigger>
-          {/*<TabsTrigger value="url" className="gap-2">
-            <LinkIcon className="w-4 h-4" />
-            URL/Link
-          </TabsTrigger>*/}
         </TabsList>
 
         <TabsContent value="file" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Upload Media File</CardTitle>
-              <CardDescription>
-                Upload a video or audio file to check for deepfakes
-              </CardDescription>
+              <CardDescription>Upload a video, audio, or image file to check for deepfakes</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              
               <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
                 <div className="flex items-center gap-3 mb-4">
                   <Video className="w-8 h-8 text-muted-foreground" />
@@ -228,21 +205,10 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
                     <p className="text-xs text-muted-foreground">Upload video files (MP4, WebM, etc.)</p>
                   </div>
                 </div>
-                <Input
-                  type="file"
-                  accept="video/*"
-                  onChange={handleVideoFileChange}
-                  className="mb-2"
-                  disabled={isScanning}
-                />
-                {selectedVideoFile && (
-                  <p className="text-sm text-muted-foreground">
-                    Selected: {selectedVideoFile.name}
-                  </p>
-                )}
+                <Input type="file" accept="video/*" onChange={handleVideoFileChange} className="mb-2" disabled={isScanning} />
+                {selectedVideoFile && <p className="text-sm text-muted-foreground">Selected: {selectedVideoFile.name}</p>}
               </div>
 
-            
               <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
                 <div className="flex items-center gap-3 mb-4">
                   <Mic className="w-8 h-8 text-muted-foreground" />
@@ -251,27 +217,23 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
                     <p className="text-xs text-muted-foreground">Upload audio files (MP3, WAV, WebM, etc.)</p>
                   </div>
                 </div>
-                <Input
-                  type="file"
-                  accept="audio/*"
-                  onChange={handleAudioFileChange}
-                  className="mb-2"
-                  disabled={isScanning}
-                />
-                {selectedAudioFile && (
-                  <p className="text-sm text-muted-foreground">
-                    Selected: {selectedAudioFile.name}
-                  </p>
-                )}
+                <Input type="file" accept="audio/*" onChange={handleAudioFileChange} className="mb-2" disabled={isScanning} />
+                {selectedAudioFile && <p className="text-sm text-muted-foreground">Selected: {selectedAudioFile.name}</p>}
               </div>
 
-            
-              <Button
-                onClick={handleFileUpload}
-                disabled={!selectedFile || isScanning}
-                className="w-full"
-                size="lg"
-              >
+              <div className="border-2 border-dashed border-border rounded-lg p-6 hover:border-primary/50 transition-colors">
+                <div className="flex items-center gap-3 mb-4">
+                  <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                  <div>
+                    <h3 className="font-semibold text-foreground">Image File</h3>
+                    <p className="text-xs text-muted-foreground">Upload image files (PNG, JPG, WebP, etc.)</p>
+                  </div>
+                </div>
+                <Input type="file" accept="image/*" onChange={handleImageFileChange} className="mb-2" disabled={isScanning} />
+                {selectedImageFile && <p className="text-sm text-muted-foreground">Selected: {selectedImageFile.name}</p>}
+              </div>
+
+              <Button onClick={handleFileUpload} disabled={!selectedFile || isScanning} className="w-full" size="lg">
                 {isScanning ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -287,52 +249,6 @@ export const Upload = ({ onScanComplete }: UploadProps) => {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/**
-         * 
-         * 
-         * <TabsContent value="url" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Enter Content URL</CardTitle>
-              <CardDescription>
-                Provide a link to video or audio content to analyze
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Input
-                  type="url"
-                  placeholder="https://example.com/video.mp4"
-                  value={contentUrl}
-                  onChange={(e) => setContentUrl(e.target.value)}
-                  disabled={isScanning}
-                />
-              </div>
-              <Button
-                onClick={handleUrlScan}
-                disabled={!contentUrl.trim() || isScanning}
-                className="w-full"
-                size="lg"
-              >
-                {isScanning ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Scanning...
-                  </>
-                ) : (
-                  <>
-                    <LinkIcon className="w-4 h-4 mr-2" />
-                    Scan URL
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-         * 
-         * 
-         */}
       </Tabs>
     </div>
   );
