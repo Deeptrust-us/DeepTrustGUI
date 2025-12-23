@@ -1,73 +1,122 @@
-# Welcome to your Lovable project
+## DeepTrustGUI
 
-## Project info
+Frontend GUI built with **Vite + React + TypeScript** (Tailwind + shadcn/ui). It provides:
 
-**URL**: https://lovable.dev/projects/96e8a8c1-aad4-48c8-b955-8475ec055dc2
+- **Media capture & upload** for deepfake detection (camera video/audio, photo capture, screen recording, file upload).
+- **Result details + history** view backed by the backend logging endpoints.
+- **PWA support** via `vite-plugin-pwa` (service worker registration in `src/main.tsx`).
 
-## How can I edit this code?
+## Quickstart (local)
 
-There are several ways of editing your application.
+### 1) Install dependencies
 
-**Use Lovable**
+```bash
+npm install
+```
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/96e8a8c1-aad4-48c8-b955-8475ec055dc2) and start prompting.
+### 2) Configure environment variables
 
-Changes made via Lovable will be committed automatically to this repo.
+Create a `.env` file in the project root (you can copy from `env.example`). At minimum you need:
 
-**Use your preferred IDE**
+- `VITE_API_BASE_URL` (**required**): base URL for the backend API (used by Axios in `src/api/baseApi.ts`).
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Example `.env.example`
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 3) Run the dev server
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Then open:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- App: `http://localhost:8080/`
 
-**Use GitHub Codespaces**
+## Configuration (env vars)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Required
 
-## What technologies are used for this project?
+- **`VITE_API_BASE_URL`**: backend API base URL (example: `http://localhost:8000`). The frontend calls endpoints like:
+  - `POST /analyze_image`
+  - `POST /analyze_video`
+  - `POST /analyze_audio`
+  - `GET /logs/all`
+  - `GET /logs/get_by_id?id=...`
+  - `DELETE /logs/delete_by_id?id=...`
 
-This project is built with:
+## Backend contract (API overview)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+All media requests are `multipart/form-data` with form field **`file`**.
 
-## How can I deploy this project?
+- **Image**: `POST /analyze_image`
+- **Video**: `POST /analyze_video`
+- **Audio**: `POST /analyze_audio`
+- **Logs**:
+  - `GET /logs/all`
+  - `GET /logs/get_by_id?id=...`
+  - `DELETE /logs/delete_by_id?id=...`
 
-Simply open [Lovable](https://lovable.dev/projects/96e8a8c1-aad4-48c8-b955-8475ec055dc2) and click on Share -> Publish.
+## Scripts
 
-## Can I connect a custom domain to my Lovable project?
+- **Dev**: `npm run dev` (Vite dev server; configured to run on port `8080` in `vite.config.ts`)
+- **Build**: `npm run build` (outputs static assets to `dist/`)
+- **Preview production build**: `npm run preview`
+- **Lint**: `npm run lint`
 
-Yes, you can!
+## Architecture (high level)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- **App entrypoint**: `src/main.tsx`
+  - Mounts React app
+  - Registers the PWA service worker (auto-update)
+- **Routing**: `src/App.tsx`
+  - `/` main app (scanner/upload/paste/screen recorder + history)
+  - `/scan_result/:id` scan result details (fetches log row by id)
+- **API layer**: `src/api/`
+  - `baseApi.ts` creates the Axios instance using `VITE_API_BASE_URL`
+  - `imageDetection.ts`, `videoDetection.ts`, `audioDetection.ts` call `/analyze_*`
+  - `handling/apiLogHandling.ts` calls `/logs/*`
+- **UI components**: `src/components/`
+  - `Scanner.tsx`: capture from camera/mic and send to backend
+  - `ScreenRecorder.tsx`: record the screen and send to backend
+  - `Upload.tsx`: upload demo files or user files and send to backend
+  - `History.tsx`: list/delete scan logs; deep-links to result details
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Demo media
+
+The repo includes demo assets under `public/demos/` (images, audio, video) used by the in-app demo menu.
+
+## Directory structure
+
+```text
+DeepTrustGUI/
+  public/
+    demos/
+      ...
+  src/
+    api/
+      audio/
+      image/
+      video/
+      handling/
+      baseApi.ts
+    components/
+      ui/
+      Scanner.tsx
+      ScreenRecorder.tsx
+      Upload.tsx
+      History.tsx
+    pages/
+      MainApp.tsx
+      ScanResult.tsx
+      NotFound.tsx
+    App.tsx
+    main.tsx
+  vite.config.ts
+  package.json
+```
+
+## Deployment note
+
+This is a static frontend. Deploy the contents of `dist/` produced by `npm run build` to any static host.
+
+- **Important**: `VITE_API_BASE_URL` is embedded at build time by Vite. Make sure it points to the correct backend in the environment where you build.
