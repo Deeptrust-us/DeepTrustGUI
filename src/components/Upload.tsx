@@ -207,13 +207,18 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
         }
 
         const blob = await resp.blob();
-        const typeFallback = demoRequest.kind === "audio" ? "audio/wav" : "video/mp4";
+        const typeFallback =
+          demoRequest.kind === "audio" ? "audio/wav" : demoRequest.kind === "image" ? "image/*" : "video/mp4";
         const file = new File([blob], demoRequest.filename, { type: blob.type || typeFallback });
 
         if (demoRequest.kind === "audio") {
           setSelectedAudioFile(file);
           setSelectedVideoFile(null);
           setSelectedImageFile(null);
+        } else if (demoRequest.kind === "image") {
+          setSelectedImageFile(file);
+          setSelectedAudioFile(null);
+          setSelectedVideoFile(null);
         } else {
           setSelectedVideoFile(file);
           setSelectedAudioFile(null);

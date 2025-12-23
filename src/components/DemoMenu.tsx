@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PlayCircle } from "lucide-react";
 
-export type DemoKind = "audio" | "video";
+export type DemoKind = "audio" | "video" | "image";
 
 export type DemoRequest = {
   id: string;
@@ -36,6 +36,8 @@ export function DemoMenu({ basePath, onPick, disabled = false }: DemoMenuProps) 
   const demos = useMemo(
     () =>
       [
+        { kind: "image" as const, filename: "real.jpeg", label: "Image — Real (real.jpeg)" },
+        { kind: "image" as const, filename: "fake.png", label: "Image — Fake (fake.png)" },
         { kind: "video" as const, filename: "real.mp4", label: "Video — Real (real.mp4)" },
         { kind: "video" as const, filename: "fake.mp4", label: "Video — Fake (fake.mp4)" },
         { kind: "video" as const, filename: "real_video.mp4", label: "Video — Real (real_video.mp4)" },
