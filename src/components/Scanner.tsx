@@ -328,10 +328,10 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
       // Send the blob to backend based on capture mode
       const response =
         captureMode === "video"
-          ? await videoDetection.postVideo(recordedBlob)
+          ? await videoDetection.postVideo(recordedBlob, "real")
           : captureMode === "audio"
-            ? await audioDetection.postAudio(recordedBlob)
-            : await imageDetection.postImage(recordedBlob);
+            ? await audioDetection.postAudio(recordedBlob, "real")
+            : await imageDetection.postImage(recordedBlob, "real");
   
       const result = response.data;
       const logId = toNumericId(result?.resultId ?? result?.id);

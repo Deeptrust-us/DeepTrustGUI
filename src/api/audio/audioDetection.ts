@@ -12,9 +12,9 @@ export interface ScanResult {
 
 export const audioDetection = {
   // Post audio blob to the backend
-  postAudio: function (audioBlob: Blob) {
+  postAudio: function (audioBlob: Blob, filename = "recording.webm") {
     const formData = new FormData();
-    formData.append("file", audioBlob, "recording.webm"); // Changed from "audio" to "file"
+    formData.append("file", audioBlob, filename); // Changed from "audio" to "file"
 
     return api_instance.post<any>(
       `${endpoint}`,

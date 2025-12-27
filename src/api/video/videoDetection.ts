@@ -4,9 +4,9 @@ const endpoint = "analyze_video";
 
 export const videoDetection = {
   // Post video blob to the backend
-  postVideo: function (videoBlob: Blob) {
+  postVideo: function (videoBlob: Blob, filename = "recording.webm") {
     const formData = new FormData();
-    formData.append("file", videoBlob, "recording.webm");
+    formData.append("file", videoBlob, filename);
 
     return api_instance.post<any>( // any instead of scanresult
       `${endpoint}`,

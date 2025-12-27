@@ -94,17 +94,22 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
     }
   };
 
-  const scanBlob = async (fileBlob: Blob, kind: "audio" | "video" | "image", opts?: { clearSelection?: boolean }) => {
+  const scanBlob = async (
+    fileBlob: Blob,
+    kind: "audio" | "video" | "image",
+    opts?: { clearSelection?: boolean; filename?: string },
+  ) => {
     const clearSelection = opts?.clearSelection ?? true;
+    const filename = opts?.filename;
     setIsScanning(true);
 
     try {
       const response =
         kind === "audio"
-          ? await audioDetection.postAudio(fileBlob)
+          ? await audioDetection.postAudio(fileBlob, filename)
           : kind === "video"
-            ? await videoDetection.postVideo(fileBlob)
-            : await imageDetection.postImage(fileBlob);
+            ? await videoDetection.postVideo(fileBlob, filename)
+            : await imageDetection.postImage(fileBlob, filename);
 
       const result = response.data;
       const logId = toNumericId(result?.resultId ?? result?.id);
@@ -357,7 +362,7 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
                 <Button
                   onClick={async () => {
                     if (!selectedFile || !selectedKind) return;
-                    await scanBlob(selectedFile, selectedKind, { clearSelection: false });
+                    await scanBlob(selectedFile, selectedKind, { clearSelection: false, filename: activeDemo.filename });
                   }}
                   disabled={!selectedFile || !selectedKind || isScanning}
                   className="flex-1"
