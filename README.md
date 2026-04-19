@@ -3,7 +3,7 @@
 Frontend GUI built with **Vite + React + TypeScript** (Tailwind + shadcn/ui). It provides:
 
 - **Media capture & upload** for deepfake detection (camera video/audio, photo capture, screen recording, file upload).
-- **Result details + history** view backed by the backend logging endpoints.
+- **Result details + history** view backed by browser `localStorage`.
 - **PWA support** via `vite-plugin-pwa` (service worker registration in `src/main.tsx`).
 
 ## Quickstart (local)
@@ -40,9 +40,6 @@ Then open:
   - `POST /analyze_image`
   - `POST /analyze_video`
   - `POST /analyze_audio`
-  - `GET /logs/all`
-  - `GET /logs/get_by_id?id=...`
-  - `DELETE /logs/delete_by_id?id=...`
 
 ## Backend contract (API overview)
 
@@ -51,10 +48,7 @@ All media requests are `multipart/form-data` with form field **`file`**.
 - **Image**: `POST /analyze_image`
 - **Video**: `POST /analyze_video`
 - **Audio**: `POST /analyze_audio`
-- **Logs**:
-  - `GET /logs/all`
-  - `GET /logs/get_by_id?id=...`
-  - `DELETE /logs/delete_by_id?id=...`
+- **History**: stored entirely in browser `localStorage` under `api_history`
 
 ## Scripts
 
@@ -70,11 +64,13 @@ All media requests are `multipart/form-data` with form field **`file`**.
   - Registers the PWA service worker (auto-update)
 - **Routing**: `src/App.tsx`
   - `/` main app (scanner/upload/paste/screen recorder + history)
-  - `/scan_result/:id` scan result details (fetches log row by id)
+  - `/scan_result/:id` scan result details (loads a local history entry by id)
 - **API layer**: `src/api/`
   - `baseApi.ts` creates the Axios instance using `VITE_API_BASE_URL`
   - `imageDetection.ts`, `videoDetection.ts`, `audioDetection.ts` call `/analyze_*`
-  - `handling/apiLogHandling.ts` calls `/logs/*`
+- **Local history**: `src/lib/historyStorage.ts`
+  - Persists analysis metadata in `localStorage`
+  - Generates frontend request ids for history/detail routes
 - **UI components**: `src/components/`
   - `Scanner.tsx`: capture from camera/mic and send to backend
   - `ScreenRecorder.tsx`: record the screen and send to backend

@@ -5,107 +5,45 @@ import { Upload } from "@/components/Upload";
 import { History } from "@/components/History";
 import { ClipboardPaste, ScanLine, Upload as UploadIcon, Video, History as HistoryIcon } from "lucide-react";
 import ScreenRecorder from "@/components/ScreenRecorder";
-import { logApi } from "@/api/handling/apiLogHandling";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { DemoMenu, type DemoRequest } from "@/components/DemoMenu";
 import ImageAnalyzer from "../components/ImageAnalyzer";
-
-type HistoryItem = { id: number; is_deepfake: boolean; date: string; hour: string };
+import { deleteHistoryEntry, getHistoryEntries, subscribeToHistoryUpdates, type HistoryLogEntry } from "@/lib/historyStorage";
 
 type Mode = "scanner" | "screen" | "upload" | "paste";
 
 const MainApp = () => {
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyItems, setHistoryItems] = useState<HistoryLogEntry[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [mode, setMode] = useState<Mode>("scanner");
   const [demoRequest, setDemoRequest] = useState<DemoRequest | null>(null);
   const { toast } = useToast();
 
-  const getErrorMessage = (error: unknown): string | undefined => {
-    if (typeof error !== "object" || !error) return undefined;
-    const e = error as { response?: { data?: { message?: unknown } } };
-    const msg = e.response?.data?.message;
-    return typeof msg === "string" ? msg : undefined;
-  };
-
-  const fetchLogs = useCallback(async () => {
-    try {
-      setIsLoadingLogs(true);
-      const response = await logApi.getAllLogs();
-
-      console.log(response.data);
-      const data: unknown = response.data;
-      const logs: HistoryItem[] = Array.isArray(data)
-        ? data
-            .map((log) => {
-              const obj = (log ?? {}) as Record<string, unknown>;
-              const idValue = obj.id;
-              const id =
-                typeof idValue === "number"
-                  ? idValue
-                  : typeof idValue === "string"
-                    ? Number.parseInt(idValue, 10)
-                    : NaN;
-              if (!Number.isFinite(id)) return null;
-
-              const isDeepfake =
-                (typeof obj.is_deepfake === "boolean" && obj.is_deepfake) ||
-                (typeof obj.isDeepFake === "boolean" && obj.isDeepFake) ||
-                (typeof obj.classification === "string" && obj.classification.toLowerCase().includes("deepfake"));
-
-              return {
-                id,
-                is_deepfake: Boolean(isDeepfake),
-                date: String(obj.date ?? ""),
-                hour: String(obj.hour ?? ""),
-              } satisfies HistoryItem;
-            })
-            .filter((x): x is HistoryItem => x !== null)
-        : [];
-
-      setHistoryItems(logs);
-    } catch (error: unknown) {
-      console.error("Error fetching logs:", error);
-      toast({
-        title: "Failed to load history",
-        description: getErrorMessage(error) || (error instanceof Error ? error.message : "Could not load scan history"),
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingLogs(false);
-    }
-  }, [toast]);
+  const fetchLogs = useCallback(() => {
+    setIsLoadingLogs(true);
+    setHistoryItems(getHistoryEntries());
+    setIsLoadingLogs(false);
+  }, []);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
 
+  useEffect(() => subscribeToHistoryUpdates(fetchLogs), [fetchLogs]);
+
   const handleScanComplete = (_result: { status: "authentic" | "fake" | null; timestamp: Date; resultId?: string }) => {
-    // After a scan completes, refetch logs to get the latest data from the backend
+    // Refresh the local history list after a new analysis is stored.
     fetchLogs();
   };
 
   const handleDeleteItem = async (id: string) => {
-    try {
-      const logId = parseInt(id, 10);
-
-      await logApi.deleteLogById(logId);
-
-      setHistoryItems((prev) => prev.filter((item) => item.id.toString() !== id));
-
-      toast({
-        title: "Log deleted",
-        description: "The scan log has been removed",
-      });
-    } catch (error: unknown) {
-      console.error("Error deleting log:", error);
-      toast({
-        title: "Delete failed",
-        description: getErrorMessage(error) || (error instanceof Error ? error.message : "Could not delete the log"),
-        variant: "destructive",
-      });
-    }
+    deleteHistoryEntry(id);
+    setHistoryItems((prev) => prev.filter((item) => item.id !== id));
+    toast({
+      title: "Log deleted",
+      description: "The local scan log has been removed",
+    });
   };
 
   const historyCount = historyItems.length;

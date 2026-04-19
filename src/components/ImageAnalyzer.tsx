@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { imageDetection } from "@/api/image/imageDetection";
 import { ClipboardPaste, Image as ImageIcon, Loader2, ScanLine, X } from "lucide-react";
+import { appendHistoryEntry, formatPercent, resolveScanStatus } from "@/lib/historyStorage";
 
 type ScanResult = "authentic" | "fake" | null;
 
@@ -19,38 +20,6 @@ export default function ImageAnalyzer({ onScanComplete, embedded = false }: Imag
 
   const [isScanning, setIsScanning] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-
-  const toNumericId = (value: unknown): number | null => {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const parsed = Number.parseInt(value, 10);
-      return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
-  };
-
-  const toStatusFromClassification = (value: unknown): ScanResult => {
-    if (typeof value !== "string") return null;
-    const v = value.trim().toLowerCase();
-    if (!v) return null;
-    if (v.includes("bonafide") || v.includes("bona fide") || v.includes("bona-fide")) return "authentic";
-    if (v.includes("auth") || v.includes("real") || v.includes("genuine")) return "authentic";
-    if (v.includes("deepfake") || v.includes("fake") || v.includes("manip")) return "fake";
-    return null;
-  };
-
-  const formatMaybePercent = (value: unknown): string | null => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "number" && Number.isFinite(value)) return `${value.toFixed(2)}%`;
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (!trimmed) return null;
-      const numeric = Number(trimmed.replace("%", ""));
-      if (Number.isFinite(numeric)) return `${numeric.toFixed(2)}%`;
-      return trimmed;
-    }
-    return null;
-  };
 
   const previewUrl = useMemo(() => {
     if (!selectedImageFile) return null;
@@ -155,17 +124,17 @@ export default function ImageAnalyzer({ onScanComplete, embedded = false }: Imag
       const response = await imageDetection.postImage(selectedImageFile, selectedImageFile.name);
       const result = response.data;
 
-      const maybeId =
-        typeof result === "object" && result
-          ? (result as { resultId?: unknown; id?: unknown }).resultId ?? (result as { id?: unknown }).id
-          : undefined;
-      const logId = toNumericId(maybeId);
-
       const classification =
         typeof result === "object" && result && "classification" in (result as Record<string, unknown>)
           ? (result as { classification?: unknown }).classification
           : undefined;
-      const status: ScanResult = toStatusFromClassification(classification);
+      const status: ScanResult = resolveScanStatus(classification);
+      const historyEntry = appendHistoryEntry({
+        result,
+        mediaType: "image",
+        previewReference: selectedImageFile.name || "clipboard-image.png",
+        endpointUsed: "analyze_image",
+      });
 
       const verdictText =
         status === "fake"
@@ -177,17 +146,25 @@ export default function ImageAnalyzer({ onScanComplete, embedded = false }: Imag
       const detailsParts: string[] = [];
       const scoreValue =
         typeof result === "object" && result && "score" in (result as Record<string, unknown>) ? (result as { score?: unknown }).score : undefined;
-      const scoreText = formatMaybePercent(scoreValue);
+      const scoreText = formatPercent(scoreValue);
+      const fidelityValue =
+        typeof result === "object" && result
+          ? (result as { fidelity?: unknown; probability?: unknown; confidence?: unknown }).fidelity ??
+            (result as { probability?: unknown }).probability ??
+            (result as { confidence?: unknown }).confidence
+          : undefined;
+      const fidelityText = formatPercent(fidelityValue);
       if (scoreText) detailsParts.push(`Score: ${scoreText}`);
+      if (fidelityText) detailsParts.push(`Fidelity: ${fidelityText}`);
       if (typeof classification === "string" && classification.trim()) {
         detailsParts.push(`Classification: ${classification}`);
       }
-      if (logId !== null) detailsParts.push(`Log #${logId}`);
+      detailsParts.push(`Request: ${historyEntry.id}`);
 
       onScanComplete({
         status,
         timestamp: new Date(),
-        resultId: logId !== null ? String(logId) : undefined,
+        resultId: historyEntry.id,
       });
 
       clearImage();
@@ -202,16 +179,16 @@ export default function ImageAnalyzer({ onScanComplete, embedded = false }: Imag
         description: detailsParts.length > 0 ? `${verdictText} ${detailsParts.join(" • ")}` : verdictText,
         variant: status === "fake" ? "destructive" : "success",
         action:
-          logId !== null ? (
+          (
             <Button
               variant="outline"
               size="sm"
               style={{ backgroundColor: "var(--primary)", color: "black" }}
-              onClick={() => navigate(`/scan_result/${logId}`)}
+              onClick={() => navigate(`/scan_result/${historyEntry.id}`)}
             >
               View Details
             </Button>
-          ) : undefined,
+          ),
       });
     } catch (error: unknown) {
       const apiMessage =

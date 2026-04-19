@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Square, ScanLine, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { appendHistoryEntry, formatPercent, resolveScanStatus } from "@/lib/historyStorage";
 
 type ScanStatus = "idle" | "recording" | "recorded" | "scanning" | "complete";
 type ScanResult = "authentic" | "fake" | null;
@@ -36,43 +37,6 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
-
-  const toNumericId = (value: unknown): number | null => {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const parsed = Number.parseInt(value, 10);
-      return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
-  };
-
-  const toStatusFromClassification = (value: unknown): ScanResult => {
-    if (typeof value !== "string") return null;
-    const v = value.trim().toLowerCase();
-    if (!v) return null;
-    if (v.includes("bonafide") || v.includes("bona fide") || v.includes("bona-fide")) return "authentic";
-    if (v.includes("auth") || v.includes("real") || v.includes("genuine")) return "authentic";
-    if (v.includes("deepfake") || v.includes("fake") || v.includes("manip")) return "fake";
-    return null;
-  };
-
-  const formatMaybePercent = (value: unknown): string | null => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "number" && Number.isFinite(value)) {
-      // Backend already returns a client-friendly 0..100 score.
-      return `${value.toFixed(2)}%`;
-    }
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (!trimmed) return null;
-      const numeric = Number(trimmed.replace("%", ""));
-      if (Number.isFinite(numeric)) {
-        return `${numeric.toFixed(2)}%`;
-      }
-      return trimmed;
-    }
-    return null;
-  };
 
   useEffect(() => {
     return () => {
@@ -334,8 +298,14 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
             : await imageDetection.postImage(recordedBlob, "real");
   
       const result = response.data;
-      const logId = toNumericId(result?.resultId ?? result?.id);
-      const status: ScanResult = result?.status ?? toStatusFromClassification(result?.classification);
+      const status: ScanResult = result?.status ?? resolveScanStatus(result?.classification);
+      const historyEntry = appendHistoryEntry({
+        result,
+        mediaType: captureMode === "audio" ? "audio" : captureMode === "photo" ? "image" : "video",
+        previewReference:
+          captureMode === "audio" ? "live-audio-recording.webm" : captureMode === "photo" ? "captured-photo.png" : "live-video-recording.webm",
+        endpointUsed: captureMode === "audio" ? "analyze_audio" : captureMode === "photo" ? "analyze_image" : "analyze_video",
+      });
       setLastAnalysis({
         classification: typeof result?.classification === "string" ? result.classification : undefined,
         score: typeof result?.score === "number" ? result.score : null,
@@ -349,14 +319,14 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
             : "Result received.";
 
       const detailsParts: string[] = [];
-      const scoreText = formatMaybePercent(
-        result?.score
-      );
+      const scoreText = formatPercent(result?.score);
+      const fidelityText = formatPercent(result?.fidelity ?? result?.probability ?? result?.confidence);
       if (scoreText) detailsParts.push(`Score: ${scoreText}`);
+      if (fidelityText) detailsParts.push(`Fidelity: ${fidelityText}`);
       if (typeof result?.classification === "string" && result.classification.trim()) {
         detailsParts.push(`Classification: ${result.classification}`);
       }
-      if (logId !== null) detailsParts.push(`Log #${logId}`);
+      detailsParts.push(`Request: ${historyEntry.id}`);
   
       setScanResult(status);
       setScanStatus("complete");
@@ -364,7 +334,7 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
       onScanComplete({
         status,
         timestamp: new Date(),
-        resultId: logId !== null ? String(logId) : undefined,
+        resultId: historyEntry.id,
       });
   
       toast({
@@ -379,16 +349,16 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
             ? `${verdictText} ${detailsParts.join(" • ")}`
             : verdictText,
         variant: status === "fake" ? "destructive" : "success",
-        action: logId !== null ? (
+        action: (
           <Button
             variant="outline"
             size="sm"
             style={{ backgroundColor: "var(--primary)", color: "black" }}
-            onClick={() => navigate(`/scan_result/${logId}`)}
+            onClick={() => navigate(`/scan_result/${historyEntry.id}`)}
           >
             View Details
           </Button>
-        ) : undefined,
+        ),
       });
     } catch (error: unknown) {
       console.error("Scan error:", error);

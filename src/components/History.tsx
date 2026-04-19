@@ -6,16 +6,10 @@ import { ShieldCheck, ShieldAlert, Clock, Trash2, Eye, Loader2, RefreshCw, Arrow
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
-
-interface HistoryItem {
-  id: number;
-  is_deepfake: boolean;
-  date: string;
-  hour: string;
-}
+import { formatPercent, type HistoryLogEntry } from "@/lib/historyStorage";
 
 interface HistoryProps {
-  items: HistoryItem[];
+  items: HistoryLogEntry[];
   onDelete: (id: string) => void;
   onRefresh?: () => void;
   isLoading?: boolean;
@@ -27,8 +21,13 @@ export function History({ items, onDelete, onRefresh, isLoading = false, embedde
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc"); // asc = oldest -> newest
 
   // Helper function to combine date and hour into a Date object
-  const getTimestamp = (date: string, hour: string): Date => {
+  const getTimestamp = (date: string, hour: string, timestamp?: string): Date => {
     try {
+      if (timestamp) {
+        const parsedTimestamp = new Date(timestamp);
+        if (!Number.isNaN(parsedTimestamp.getTime())) return parsedTimestamp;
+      }
+
       const safeDate = String(date ?? "").trim();
       const safeHour = String(hour ?? "").trim();
 
@@ -53,12 +52,12 @@ export function History({ items, onDelete, onRefresh, isLoading = false, embedde
   const sortedItems = useMemo(() => {
     const copy = [...items];
     copy.sort((a, b) => {
-      const ta = getTimestamp(a.date, a.hour).getTime();
-      const tb = getTimestamp(b.date, b.hour).getTime();
+      const ta = getTimestamp(a.date, a.hour, a.timestamp).getTime();
+      const tb = getTimestamp(b.date, b.hour, b.timestamp).getTime();
       const diff = ta - tb;
       if (diff !== 0) return sortOrder === "asc" ? diff : -diff;
       // Tie-breaker for deterministic order
-      return sortOrder === "asc" ? a.id - b.id : b.id - a.id;
+      return sortOrder === "asc" ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id);
     });
     return copy;
   }, [items, sortOrder]);
@@ -149,8 +148,10 @@ export function History({ items, onDelete, onRefresh, isLoading = false, embedde
         <ScrollArea className={scrollAreaHeightClass}>
           <div className="space-y-3">
             {sortedItems.map((item) => {
-              const isAuthentic = !item.is_deepfake;
-              const timestamp = getTimestamp(item.date, item.hour);
+              const isAuthentic = !item.isDeepfake;
+              const timestamp = getTimestamp(item.date, item.hour, item.timestamp);
+              const scoreText = formatPercent(item.score);
+              const fidelityText = formatPercent(item.fidelity);
               
               return (
                 <Card
@@ -179,9 +180,7 @@ export function History({ items, onDelete, onRefresh, isLoading = false, embedde
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-foreground">
-                          {isAuthentic
-                            ? "Bonafide"
-                            : "Deepfake"}
+                          {item.classification || (isAuthentic ? "Bonafide" : "Deepfake")}
                         </h3>
                         <Badge
                           variant={isAuthentic ? "default" : "destructive"}
@@ -196,6 +195,22 @@ export function History({ items, onDelete, onRefresh, isLoading = false, embedde
                           ? "No signs of manipulation detected"
                           : "Potential manipulation identified"}
                       </p>
+
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Badge variant="secondary" className="text-xs uppercase">
+                          {item.mediaType}
+                        </Badge>
+                        {scoreText && (
+                          <Badge variant="outline" className="text-xs">
+                            Score {scoreText}
+                          </Badge>
+                        )}
+                        {fidelityText && (
+                          <Badge variant="outline" className="text-xs">
+                            Fidelity {fidelityText}
+                          </Badge>
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" />
@@ -222,7 +237,7 @@ export function History({ items, onDelete, onRefresh, isLoading = false, embedde
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDelete(item.id.toString());
+                          onDelete(item.id);
                         }}
                         className="flex items-center gap-1 text-destructive hover:text-destructive"
                       >
