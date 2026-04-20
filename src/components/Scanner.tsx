@@ -24,7 +24,7 @@ interface ScannerProps {
 export default function Scanner({ onScanComplete, embedded = false }: ScannerProps) {
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [scanResult, setScanResult] = useState<ScanResult>(null);
-  const [lastAnalysis, setLastAnalysis] = useState<{ classification?: string; score?: number | null } | null>(null);
+  const [lastAnalysis, setLastAnalysis] = useState<{ classification?: string; manipulationRisk?: number | null } | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [hasPermissions, setHasPermissions] = useState(false);
@@ -333,7 +333,7 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
       });
       setLastAnalysis({
         classification: typeof result?.classification === "string" ? result.classification : undefined,
-        score: typeof result?.score === "number" ? result.score : null,
+        manipulationRisk: typeof result?.score === "number" ? result.score : null,
       });
 
       const verdictText =
@@ -344,9 +344,9 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
             : "Result received.";
 
       const detailsParts: string[] = [];
-      const scoreText = formatPercent(result?.score);
+      const manipulationRiskText = formatPercent(result?.score);
       const fidelityText = formatPercent(result?.fidelity ?? result?.probability ?? result?.confidence);
-      if (scoreText) detailsParts.push(`Score: ${scoreText}`);
+      if (manipulationRiskText) detailsParts.push(`Manipulation Risk: ${manipulationRiskText}`);
       if (fidelityText) detailsParts.push(`Fidelity: ${fidelityText}`);
       if (typeof result?.classification === "string" && result.classification.trim()) {
         detailsParts.push(`Classification: ${result.classification}`);
@@ -604,8 +604,8 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
                   <div>
                     <h3 className="text-2xl font-bold text-success-foreground">Bonafide</h3>
                     <p className="text-sm text-success-foreground/80 mt-2">
-                      {lastAnalysis?.score !== null && lastAnalysis?.score !== undefined
-                        ? `This looks good (Bonafide). Score: ${lastAnalysis.score.toFixed(2)}%`
+                      {lastAnalysis?.manipulationRisk !== null && lastAnalysis?.manipulationRisk !== undefined
+                        ? `This looks good (Bonafide). Manipulation Risk: ${lastAnalysis.manipulationRisk.toFixed(2)}%`
                         : "This looks good (Bonafide)."}
                     </p>
                   </div>
@@ -616,8 +616,8 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
                   <div>
                     <h3 className="text-2xl font-bold text-destructive-foreground">Deepfake Detected</h3>
                     <p className="text-sm text-destructive-foreground/80 mt-2">
-                      {lastAnalysis?.score !== null && lastAnalysis?.score !== undefined
-                        ? `This is potentially a Deepfake. Score: ${lastAnalysis.score.toFixed(2)}%`
+                      {lastAnalysis?.manipulationRisk !== null && lastAnalysis?.manipulationRisk !== undefined
+                        ? `This is potentially a Deepfake. Manipulation Risk: ${lastAnalysis.manipulationRisk.toFixed(2)}%`
                         : "This is potentially a Deepfake."}
                     </p>
                   </div>

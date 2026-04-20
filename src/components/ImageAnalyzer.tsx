@@ -144,9 +144,9 @@ export default function ImageAnalyzer({ onScanComplete, embedded = false }: Imag
             : "Result received.";
 
       const detailsParts: string[] = [];
-      const scoreValue =
+      const manipulationRiskValue =
         typeof result === "object" && result && "score" in (result as Record<string, unknown>) ? (result as { score?: unknown }).score : undefined;
-      const scoreText = formatPercent(scoreValue);
+      const manipulationRiskText = formatPercent(manipulationRiskValue);
       const fidelityValue =
         typeof result === "object" && result
           ? (result as { fidelity?: unknown; probability?: unknown; confidence?: unknown }).fidelity ??
@@ -154,7 +154,7 @@ export default function ImageAnalyzer({ onScanComplete, embedded = false }: Imag
             (result as { confidence?: unknown }).confidence
           : undefined;
       const fidelityText = formatPercent(fidelityValue);
-      if (scoreText) detailsParts.push(`Score: ${scoreText}`);
+      if (manipulationRiskText) detailsParts.push(`Manipulation Risk: ${manipulationRiskText}`);
       if (fidelityText) detailsParts.push(`Fidelity: ${fidelityText}`);
       if (typeof classification === "string" && classification.trim()) {
         detailsParts.push(`Classification: ${classification}`);

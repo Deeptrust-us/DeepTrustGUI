@@ -92,9 +92,9 @@ export const Upload = ({ onScanComplete, embedded = false, demoRequest = null, o
             : "Result received.";
 
       const detailsParts: string[] = [];
-      const scoreText = formatPercent(result?.score);
+      const manipulationRiskText = formatPercent(result?.score);
       const fidelityText = formatPercent(result?.fidelity ?? result?.probability ?? result?.confidence);
-      if (scoreText) detailsParts.push(`Score: ${scoreText}`);
+      if (manipulationRiskText) detailsParts.push(`Manipulation Risk: ${manipulationRiskText}`);
       if (fidelityText) detailsParts.push(`Fidelity: ${fidelityText}`);
       if (typeof result?.classification === "string" && result.classification.trim()) {
         detailsParts.push(`Classification: ${result.classification}`);

@@ -44,7 +44,7 @@ const ScanResult = () => {
   const pageBg = isLoading || loadError || !log ? "bg-white" : isDeepfake ? "bg-red-50" : "bg-green-50";
   const detailsCardBorder =
     isLoading || loadError || !log ? "border-gray-200" : isDeepfake ? "border-red-200" : "border-green-200";
-  const score = formatPercent(log?.score) ?? "—";
+  const manipulationRisk = formatPercent(log?.score) ?? "—";
   const fidelity = formatPercent(log?.fidelity) ?? "—";
 
   return (
@@ -111,8 +111,8 @@ const ScanResult = () => {
           <span className="text-gray-900 font-semibold">{classification}</span>
         </div>
         <div className="flex justify-between items-center py-3 border-b border-gray-200">
-          <span className="text-gray-700 font-medium">Score</span>
-          <span className={`text-xl font-bold ${statusColor}`}>{score}</span>
+          <span className="text-gray-700 font-medium">Manipulation Risk</span>
+          <span className={`text-xl font-bold ${statusColor}`}>{manipulationRisk}</span>
         </div>
         <div className="flex justify-between items-center py-3 border-b border-gray-200">
           <span className="text-gray-700 font-medium">Fidelity</span>
@@ -129,6 +129,46 @@ const ScanResult = () => {
         <div className="flex justify-between items-center py-3">
           <span className="text-gray-700 font-medium">Endpoint</span>
           <span className="text-gray-900 font-semibold">{log?.endpointUsed ?? "—"}</span>
+        </div>
+      </div>
+
+      <div className={`w-full max-w-md bg-white rounded-lg shadow-md p-6 mb-6 border ${detailsCardBorder}`}>
+        <div className="space-y-4 text-sm text-gray-700">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Understanding Your Results</h3>
+            <p className="mt-2">
+              Each analysis provides two key indicators to help you interpret the outcome:
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-gray-900">Risk of Manipulation</h4>
+            <p className="mt-1">
+              This represents how likely the content is to be altered or artificially generated.
+            </p>
+            <p className="mt-2">A low value suggests the content is likely authentic (bonafide).</p>
+            <p className="mt-1">A high value indicates a higher probability of manipulation (e.g., deepfake).</p>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-gray-900">Fidelity</h4>
+            <p className="mt-1">
+              This reflects how reliable the analysis is. It indicates the level of confidence the system has in its prediction.
+            </p>
+            <p className="mt-2">A higher value means the result is more trustworthy.</p>
+            <p className="mt-1">
+              A lower value suggests uncertainty, often due to factors like low quality, compression, or limited visible information.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-gray-900">How to interpret both together</h4>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>Low risk + high fidelity: likely authentic and reliable result</li>
+              <li>High risk + high fidelity: likely manipulated and reliable result</li>
+              <li>Any result with low fidelity: interpret with caution</li>
+            </ul>
+          </div>
         </div>
       </div>
 

@@ -150,7 +150,7 @@ export function History({ items, onDelete, onRefresh, isLoading = false, embedde
             {sortedItems.map((item) => {
               const isAuthentic = !item.isDeepfake;
               const timestamp = getTimestamp(item.date, item.hour, item.timestamp);
-              const scoreText = formatPercent(item.score);
+              const manipulationRiskText = formatPercent(item.score);
               const fidelityText = formatPercent(item.fidelity);
               
               return (
@@ -200,9 +200,9 @@ export function History({ items, onDelete, onRefresh, isLoading = false, embedde
                         <Badge variant="secondary" className="text-xs uppercase">
                           {item.mediaType}
                         </Badge>
-                        {scoreText && (
+                        {manipulationRiskText && (
                           <Badge variant="outline" className="text-xs">
-                            Score {scoreText}
+                            Manipulation Risk {manipulationRiskText}
                           </Badge>
                         )}
                         {fidelityText && (

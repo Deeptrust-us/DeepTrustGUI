@@ -19,7 +19,7 @@ export default function ScreenRecorder({ onScanComplete, embedded = false }: Scr
   const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [scanResult, setScanResult] = useState<"authentic" | "fake" | null>(null);
-  const [lastAnalysis, setLastAnalysis] = useState<{ classification?: string; score?: number | null } | null>(null);
+  const [lastAnalysis, setLastAnalysis] = useState<{ classification?: string; manipulationRisk?: number | null } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null); // Store blob for scanning
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -170,7 +170,7 @@ export default function ScreenRecorder({ onScanComplete, embedded = false }: Scr
       });
       setLastAnalysis({
         classification: typeof result?.classification === "string" ? result.classification : undefined,
-        score: typeof result?.score === "number" ? result.score : null,
+        manipulationRisk: typeof result?.score === "number" ? result.score : null,
       });
 
       const verdictText =
@@ -181,9 +181,9 @@ export default function ScreenRecorder({ onScanComplete, embedded = false }: Scr
             : "Result received.";
 
       const detailsParts: string[] = [];
-      const scoreText = formatPercent(result?.score);
+      const manipulationRiskText = formatPercent(result?.score);
       const fidelityText = formatPercent(result?.fidelity ?? result?.probability ?? result?.confidence);
-      if (scoreText) detailsParts.push(`Score: ${scoreText}`);
+      if (manipulationRiskText) detailsParts.push(`Manipulation Risk: ${manipulationRiskText}`);
       if (fidelityText) detailsParts.push(`Fidelity: ${fidelityText}`);
       if (typeof result?.classification === "string" && result.classification.trim()) {
         detailsParts.push(`Classification: ${result.classification}`);
@@ -347,8 +347,8 @@ export default function ScreenRecorder({ onScanComplete, embedded = false }: Scr
                         <div>
                           <h3 className="text-2xl font-bold text-success-foreground">Bonafide</h3>
                           <p className="text-sm text-success-foreground/80 mt-2">
-                            {lastAnalysis?.score !== null && lastAnalysis?.score !== undefined
-                              ? `This looks good (Bonafide). Score: ${lastAnalysis.score.toFixed(2)}%`
+                            {lastAnalysis?.manipulationRisk !== null && lastAnalysis?.manipulationRisk !== undefined
+                              ? `This looks good (Bonafide). Manipulation Risk: ${lastAnalysis.manipulationRisk.toFixed(2)}%`
                               : "This looks good (Bonafide)."}
                           </p>
                         </div>
@@ -359,8 +359,8 @@ export default function ScreenRecorder({ onScanComplete, embedded = false }: Scr
                         <div>
                           <h3 className="text-2xl font-bold text-destructive-foreground">Deepfake Detected</h3>
                           <p className="text-sm text-destructive-foreground/80 mt-2">
-                            {lastAnalysis?.score !== null && lastAnalysis?.score !== undefined
-                              ? `This is potentially a Deepfake. Score: ${lastAnalysis.score.toFixed(2)}%`
+                            {lastAnalysis?.manipulationRisk !== null && lastAnalysis?.manipulationRisk !== undefined
+                              ? `This is potentially a Deepfake. Manipulation Risk: ${lastAnalysis.manipulationRisk.toFixed(2)}%`
                               : "This is potentially a Deepfake."}
                           </p>
                         </div>
