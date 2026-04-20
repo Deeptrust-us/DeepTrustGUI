@@ -6,13 +6,15 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Square, ScanLine, Image as ImageIcon } from "lucide-react";
+import { Camera, Mic, ShieldCheck, ShieldAlert, Loader2, Square, ScanLine, Image as ImageIcon, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { appendHistoryEntry, formatPercent, resolveScanStatus } from "@/lib/historyStorage";
 
 type ScanStatus = "idle" | "recording" | "recorded" | "scanning" | "complete";
 type ScanResult = "authentic" | "fake" | null;
 type CaptureMode = "video" | "audio" | "photo";
+type CameraFacingMode = "user" | "environment";
 
 interface ScannerProps {
   onScanComplete: (result: { status: ScanResult; timestamp: Date; resultId?: string }) => void;
@@ -20,7 +22,6 @@ interface ScannerProps {
 }
 
 export default function Scanner({ onScanComplete, embedded = false }: ScannerProps) {
-
   const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [lastAnalysis, setLastAnalysis] = useState<{ classification?: string; score?: number | null } | null>(null);
@@ -28,24 +29,42 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
   const streamRef = useRef<MediaStream | null>(null);
   const [hasPermissions, setHasPermissions] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureMode>("video");
+  const [cameraFacingMode, setCameraFacingMode] = useState<CameraFacingMode>("user");
   const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
   const [recordedImage, setRecordedImage] = useState<string | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+
+  const stopCurrentStream = () => {
+    const activeStream = streamRef.current;
+    if (activeStream) {
+      activeStream.getTracks().forEach((track) => track.stop());
+    }
+    streamRef.current = null;
+    setStream(null);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
 
   useEffect(() => {
     return () => {
-      const s = streamRef.current;
-      if (s) s.getTracks().forEach((track) => track.stop());
+      const activeStream = streamRef.current;
+      if (activeStream) activeStream.getTracks().forEach((track) => track.stop());
     };
   }, []);
 
-  const requestCameraPermissions = async () => {
+  const requestCameraPermissions = async (
+    facingMode = cameraFacingMode,
+    options?: { successMessage?: string },
+  ) => {
     try {
       // Check if mediaDevices is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -54,11 +73,13 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
           description: "Your browser doesn't support camera access. Please use a modern browser with HTTPS.",
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
+      stopCurrentStream();
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: captureMode === "photo" ? "environment" : "user" },
+        video: { facingMode: { ideal: facingMode } },
         audio: captureMode === "video",
       });
 
@@ -72,8 +93,11 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
 
       toast({
         title: "Access granted",
-        description: captureMode === "photo" ? "Camera is ready" : "Camera and microphone are ready",
+        description:
+          options?.successMessage ??
+          (captureMode === "photo" ? "Camera is ready" : "Camera and microphone are ready"),
       });
+      return true;
     } catch (error) {
       console.error("Camera access error:", error);
       
@@ -96,6 +120,7 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
         description: errorMessage,
         variant: "destructive",
       });
+      return false;
     }
   };
 
@@ -390,14 +415,8 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
     setRecordedBlob(null);
 
     // Stop current stream
-    const s = streamRef.current;
-    if (s) s.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    setStream(null);
+    stopCurrentStream();
     setHasPermissions(false);
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
 
     // Clean up recorded video URL
     if (recordedVideo) {
@@ -410,20 +429,33 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
 
   // Reset when switching modes
   useEffect(() => {
-    const s = streamRef.current;
-    if (s) s.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    setStream(null);
+    stopCurrentStream();
     setHasPermissions(false);
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
     setRecordedVideo(null);
     setRecordedImage(null);
     setRecordedBlob(null);
     setScanResult(null);
     setScanStatus("idle");
+    setCameraFacingMode(captureMode === "photo" ? "environment" : "user");
   }, [captureMode]);
+
+  const toggleCameraFacing = async () => {
+    const nextFacingMode: CameraFacingMode = cameraFacingMode === "user" ? "environment" : "user";
+    setCameraFacingMode(nextFacingMode);
+
+    if (!hasPermissions || scanStatus !== "idle") {
+      return;
+    }
+
+    setIsSwitchingCamera(true);
+    const success = await requestCameraPermissions(nextFacingMode, {
+      successMessage: nextFacingMode === "user" ? "Front camera is ready" : "Back camera is ready",
+    });
+    if (!success) {
+      setCameraFacingMode(cameraFacingMode);
+    }
+    setIsSwitchingCamera(false);
+  };
 
   const themedCardClass =
     scanStatus === "complete" && scanResult
@@ -608,51 +640,67 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
 
       {/* Control Buttons */}
       {scanStatus === "idle" && (
-        <Button
-          onClick={captureMode === "photo" ? takePhoto : startRecording}
-          size="lg"
-          className="w-full max-w-md h-14 bg-gradient-primary hover:opacity-90 text-white font-semibold text-lg shadow-glow"
-        >
-          {hasPermissions ? (
-            <>
-              {captureMode === "video" ? (
-                <>
-                  <Camera className="w-5 h-5 mr-2" />
-                  Start Recording
-                </>
-              ) : captureMode === "photo" ? (
-                <>
-                  <ImageIcon className="w-5 h-5 mr-2" />
-                  Take Photo
-                </>
-              ) : (
-                <>
-                  <Mic className="w-5 h-5 mr-2" />
-                  Start Recording
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              {captureMode === "video" ? (
-                <>
-                  <Camera className="w-5 h-5 mr-2" />
-                  Enable Camera & Mic
-                </>
-              ) : captureMode === "photo" ? (
-                <>
-                  <Camera className="w-5 h-5 mr-2" />
-                  Enable Camera
-                </>
-              ) : (
-                <>
-                  <Mic className="w-5 h-5 mr-2" />
-                  Enable Microphone
-                </>
-              )}
-            </>
+        <div className="w-full max-w-md space-y-3">
+          <Button
+            onClick={captureMode === "photo" ? takePhoto : startRecording}
+            size="lg"
+            className="w-full h-14 bg-gradient-primary hover:opacity-90 text-white font-semibold text-lg shadow-glow"
+          >
+            {hasPermissions ? (
+              <>
+                {captureMode === "video" ? (
+                  <>
+                    <Camera className="w-5 h-5 mr-2" />
+                    Start Recording
+                  </>
+                ) : captureMode === "photo" ? (
+                  <>
+                    <ImageIcon className="w-5 h-5 mr-2" />
+                    Take Photo
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-5 h-5 mr-2" />
+                    Start Recording
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                {captureMode === "video" ? (
+                  <>
+                    <Camera className="w-5 h-5 mr-2" />
+                    Enable Camera & Mic
+                  </>
+                ) : captureMode === "photo" ? (
+                  <>
+                    <Camera className="w-5 h-5 mr-2" />
+                    Enable Camera
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-5 h-5 mr-2" />
+                    Enable Microphone
+                  </>
+                )}
+              </>
+            )}
+          </Button>
+
+          {isMobile && (captureMode === "video" || captureMode === "photo") && (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={toggleCameraFacing}
+              disabled={isSwitchingCamera}
+              className="w-full h-12"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isSwitchingCamera ? "animate-spin" : ""}`} />
+              {cameraFacingMode === "user" ? "Switch to Back Camera" : "Switch to Front Camera"}
+            </Button>
           )}
-        </Button>
+        </div>
       )}
 
       {scanStatus === "recording" && (
