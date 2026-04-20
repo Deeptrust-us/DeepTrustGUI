@@ -1,8 +1,10 @@
 import { useState, useRef } from "react";
 import { useNavigate} from "react-router-dom";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Video, Download, Loader2, Square, ScanLine, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/hooks/use-toast";
 import { videoDetection } from "@/api/video/videoDetection";
 import { appendHistoryEntry, formatPercent, resolveScanStatus } from "@/lib/historyStorage";
@@ -15,6 +17,7 @@ interface ScreenRecorderProps {
 
 export default function ScreenRecorder({ onScanComplete, embedded = false }: ScreenRecorderProps) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [isRecording, setIsRecording] = useState(false);
   const [recordedVideo, setRecordedVideo] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -28,6 +31,15 @@ export default function ScreenRecorder({ onScanComplete, embedded = false }: Scr
   const { toast } = useToast();
 
   const startRecording = async () => {
+    if (isMobile) {
+      toast({
+        title: "Screen recording may not work on phones",
+        description:
+          "Some mobile browsers and operating systems require extra permissions, or do not support screen recording from the browser. We recommend recording your screen with another app and uploading the video instead.",
+      });
+      return;
+    }
+
     try {
       // Request screen capture
       const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -275,8 +287,20 @@ export default function ScreenRecorder({ onScanComplete, embedded = false }: Scr
             <Video className="w-16 h-16 mx-auto text-muted-foreground" />
             <div>
               <h2 className="text-2xl font-bold mb-2">Screen Recorder</h2>
+              {isMobile && (
+                <Alert className="mb-6 text-left border-amber-500/50 bg-amber-500/10">
+                  <ShieldAlert className="h-4 w-4 text-amber-600" />
+                  <AlertTitle>Mobile browsers may block screen recording</AlertTitle>
+                  <AlertDescription>
+                    Some phones require extra permissions, and some devices do not allow browser-based screen capture at all.
+                    We recommend recording your screen with another app and then uploading the video in the Upload tab.
+                  </AlertDescription>
+                </Alert>
+              )}
               <p className="text-muted-foreground mb-6">
-                Click the button below to start recording your screen. The recording will be saved when you stop it.
+                {isMobile
+                  ? "Screen recording from the browser works best on desktop. On phones, we recommend recording with another app and uploading the video instead."
+                  : "Click the button below to start recording your screen. The recording will be saved when you stop it."}
               </p>
             </div>
             <Button
