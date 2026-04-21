@@ -319,7 +319,7 @@ export default function Scanner({ onScanComplete, embedded = false }: ScannerPro
         captureMode === "video"
           ? await videoDetection.postVideo(recordedBlob, "real")
           : captureMode === "audio"
-            ? await audioDetection.postAudio(recordedBlob, "real")
+            ? await audioDetection.postAudio(recordedBlob)
             : await imageDetection.postImage(recordedBlob, "real");
   
       const result = response.data;
